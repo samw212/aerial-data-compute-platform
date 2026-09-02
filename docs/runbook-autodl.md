@@ -95,13 +95,61 @@ The service keeps running after you leave; disconnecting does not stop it.
 
 ## 4. Installing Groma for the first time
 
+### 4a. First decide: is the code public or private?
+
+The Groma code lives on GitHub at `samw212/aerial-data-compute-platform`, and
+**right now that repository is private.** A private repository refuses anonymous
+downloads, so the instance cannot fetch the code unless you give it a way in. You
+have two choices; pick one before going on.
+
+**Option 1 — make the repository public.** Simplest. On GitHub, open the
+repository, click **Settings**, scroll to the **Danger Zone** at the bottom, click
+**Change visibility**, choose **Public**, and confirm. Nothing about the code needs
+a private repository — the design documents are not secret and there are no
+credentials in it. If you go this way, use the commands in 4b as written.
+
+**Option 2 — keep it private and create a read-only token.** A token is a long
+password that grants exactly one permission: reading this one repository. Create it
+like this, in your browser:
+
+1. On GitHub, click your picture (top right) → **Settings**.
+2. Left column, at the bottom: **Developer settings**.
+3. **Personal access tokens** → **Fine-grained tokens** → **Generate new token**.
+4. Give it a name (`groma-autodl`), an expiry (a year is fine), and under
+   **Repository access** choose **Only select repositories** and pick
+   `aerial-data-compute-platform`.
+5. Under **Permissions → Repository permissions**, set **Contents** to
+   **Read-only**. Leave everything else alone.
+6. Click **Generate token** and copy it. It starts with `github_pat_` and you will
+   not be shown it again — paste it somewhere safe for the next ten minutes.
+
+If you go this way, use the commands in 4c instead. The token is stored once on the
+instance in a file only `root` can read, and you will not need it again there.
+
+### 4b. Install (public repository)
+
 Connect to the instance (section 3). Then paste this one line and press Enter:
 
 ```
 curl -fsSL https://raw.githubusercontent.com/samw212/aerial-data-compute-platform/main/deploy/autodl/bootstrap.sh | GROMA_BRANCH=main bash
 ```
 
-What it does, in order, printing a blue `==>` heading for each step:
+### 4c. Install (private repository, with a token)
+
+Connect to the instance (section 3). Put your token in place of `github_pat_XXXX`
+in **both** places, then paste the whole line and press Enter:
+
+```
+curl -fsSL -H "Authorization: token github_pat_XXXX" https://raw.githubusercontent.com/samw212/aerial-data-compute-platform/main/deploy/autodl/bootstrap.sh | GROMA_GITHUB_TOKEN=github_pat_XXXX GROMA_BRANCH=main bash
+```
+
+(The first copy lets the installer itself be downloaded; the second lets the
+installer download the code.)
+
+### What the installer does
+
+Either way, it does the same things, in order, printing a blue `==>` heading for
+each step:
 
 1. Checks the machine has what it needs.
 2. Installs `uv`, the tool that manages Python for this project.
@@ -129,11 +177,20 @@ source /etc/network_turbo
 ### Installing a branch other than `main`
 
 If you have been told the code is on a branch — for instance while a change is under
-review — put its name in place of `main` in both places:
+review — put its name in place of `main` in both places. The branch this guide was
+first written on is `claude/repo-setup-devy66`, so until that is merged into `main`:
 
 ```
 curl -fsSL https://raw.githubusercontent.com/samw212/aerial-data-compute-platform/claude/repo-setup-devy66/deploy/autodl/bootstrap.sh | GROMA_BRANCH=claude/repo-setup-devy66 bash
 ```
+
+(add the two token pieces from 4c if the repository is private.)
+
+### If it says "code download failed"
+
+That is the private-repository problem from 4a: either the repository is still
+private and no token was given, or the token was pasted wrongly. Re-read 4a and try
+again — the installer is safe to rerun.
 
 ## 5. Seeing it in your browser
 
@@ -395,7 +452,7 @@ ssh -p 54959 root@connect.bjb2.seetacloud.com          connect (copy the real on
 ssh -L 6006:127.0.0.1:6006 -p 54959 root@...            connect AND make http://localhost:6006 work
 exit                                                    disconnect
 
-# On the instance, first time only
+# On the instance, first time only (public repository — see section 4 if private)
 curl -fsSL https://raw.githubusercontent.com/samw212/aerial-data-compute-platform/main/deploy/autodl/bootstrap.sh | GROMA_BRANCH=main bash
 
 # On the instance, every day

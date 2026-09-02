@@ -8,6 +8,8 @@
 # script only sends bootstrap.sh across and runs it there.
 #
 # Optional: GROMA_BRANCH=<branch> to deploy something other than main.
+# Private repository: GROMA_GITHUB_TOKEN=<token> is passed through to the instance,
+# where bootstrap.sh stores it in a root-only file for git to use.
 
 set -euo pipefail
 
@@ -24,4 +26,4 @@ BRANCH="${GROMA_BRANCH:-main}"
 echo "Deploying branch $BRANCH via: $SSH_CMD"
 echo "(you will be asked for the instance password)"
 # shellcheck disable=SC2086
-$SSH_CMD "GROMA_BRANCH='$BRANCH' bash -s" < "$HERE/bootstrap.sh"
+$SSH_CMD "GROMA_BRANCH='$BRANCH' GROMA_GITHUB_TOKEN='${GROMA_GITHUB_TOKEN:-}' bash -s" < "$HERE/bootstrap.sh"

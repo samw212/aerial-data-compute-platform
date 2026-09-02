@@ -107,6 +107,8 @@ fallback.
     make lint           # ruff + mypy + tsc
     make seed           # site_alpha fixture into the dev database
     make kernel-bench
+    make serve          # the coverage service on http://127.0.0.1:6006
+    make deploy-autodl SSH="ssh -p <port> root@<host>"   # see docs/runbook-autodl.md
 
 ## Working on the coverage kernel
 

@@ -121,7 +121,14 @@ routes when M4 lands; only the heatmap encoder is meant to survive.
 This sandbox cannot open SSH connections (its egress is HTTPS on port 443 only), so
 the deployment was **not executed against the target instance from here**. The
 installer was exercised end to end on a local clone instead — install, tests,
-supervisord, health check — and the runbook tells the operator how to run it.
+supervisord, health check, and every `groma-ctl` verb — and the runbook tells the
+operator how to run it.
+
+The GitHub repository is **private**, which blocks anonymous downloads on the
+instance. The installer accepts a read-only token (`GROMA_GITHUB_TOKEN`) and stores
+it in a root-only credential file so that later `groma-ctl update` runs need
+nothing; the runbook's section 4 walks a non-technical operator through creating
+one, and offers making the repository public as the simpler alternative.
 
 ## Three performance defects found and fixed in M1
 

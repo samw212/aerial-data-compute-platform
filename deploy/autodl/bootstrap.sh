@@ -22,6 +22,13 @@
 #   GROMA_BRANCH    branch to check out              (default main)
 #   GROMA_PORT      port to serve on                 (default 6006, AutoDL's exposed port)
 #   GROMA_SKIP_TESTS=1   skip the test suite (not recommended)
+#
+# Private repository:
+#
+#   GROMA_GITHUB_TOKEN   a GitHub token with read access to the repository's
+#                        contents. Stored once, in a root-only file on the
+#                        instance, so that `groma-ctl update` works afterwards
+#                        without asking again. Not needed for a public repository.
 
 set -euo pipefail
 
@@ -66,13 +73,40 @@ ok "uv $(uv --version | awk '{print $2}')"
 
 # ------------------------------------------------------------------------- code
 say "Fetching the code ($GROMA_REPO, branch $GROMA_BRANCH)"
+
+# A private GitHub repository needs a token. It goes into git's credential
+# store in a root-only file rather than into the remote URL, so it never shows
+# up in `git remote -v`, in `groma-ctl where`, or in a pasted screenshot.
+if [ -n "${GROMA_GITHUB_TOKEN:-}" ]; then
+  CRED="$RUN/git-credentials"
+  ( umask 077; printf 'https://x-access-token:%s@github.com\n' "$GROMA_GITHUB_TOKEN" > "$CRED" )
+  git config --global credential.helper "store --file=$CRED"
+  ok "GitHub token stored in $CRED (readable by root only)"
+fi
+
+clone_failed() {
+  cat >&2 <<EOF
+
+    Could not fetch $GROMA_REPO (branch $GROMA_BRANCH).
+
+    If the repository is private, GitHub refuses anonymous downloads. Either:
+      - make the repository public (GitHub -> Settings -> Danger zone -> Change visibility), or
+      - run this again with a read-only token:  GROMA_GITHUB_TOKEN=github_pat_... bash bootstrap.sh
+    docs/runbook-autodl.md section 4 walks through creating that token.
+
+    If the branch name is wrong, GROMA_BRANCH=<name> selects another.
+EOF
+  fail "code download failed"
+}
+
 if [ -d "$APP/.git" ]; then
   git -C "$APP" remote set-url origin "$GROMA_REPO"
-  git -C "$APP" fetch --quiet origin "$GROMA_BRANCH"
+  git -C "$APP" fetch --quiet origin "$GROMA_BRANCH" || clone_failed
   git -C "$APP" checkout --quiet -B "$GROMA_BRANCH" "origin/$GROMA_BRANCH"
   ok "updated to $(git -C "$APP" rev-parse --short HEAD)"
 else
-  git clone --quiet --branch "$GROMA_BRANCH" "$GROMA_REPO" "$APP"
+  rm -rf "$APP"
+  git clone --quiet --branch "$GROMA_BRANCH" "$GROMA_REPO" "$APP" || clone_failed
   ok "cloned at $(git -C "$APP" rev-parse --short HEAD)"
 fi
 

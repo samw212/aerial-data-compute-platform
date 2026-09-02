@@ -39,7 +39,12 @@ make kernel-bench     # the 800 ms performance target
 uv run groma coverage                  # coverage over site_alpha
 uv run groma coverage --tents          # with the event tents up
 uv run groma compare-tents             # what the tents cost
+make serve                             # the same, as a web page on http://127.0.0.1:6006
 ```
+
+To put it on an AutoDL instance, see [`docs/runbook-autodl.md`](docs/runbook-autodl.md).
+It is one command on the instance, and the guide assumes no prior experience with
+servers or terminals.
 
 `uv run groma coverage` prints:
 
