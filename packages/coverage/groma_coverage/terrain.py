@@ -79,6 +79,20 @@ def terrain_blocks(
         return blocked
 
     idx = np.flatnonzero(candidate)
+
+    # Coarse pass. The global bound above does nothing on a slope, because the
+    # top of the slope is the maximum, and a real DTM always has some slope: on a
+    # 3% grade the fine march alone took 6.6 s. This pass samples the ray every
+    # coarse cell instead of every fine cell and compares it against the
+    # max-pooled, dilated heightfield. A stretch of ray whose lower end sits above
+    # that bound cannot touch the true surface anywhere along it, so a ray that
+    # clears every stretch is rejected exactly, at one sixteenth of the cost.
+    # Rays that do not clear go on to the fine march, which is unchanged.
+    survivors = _coarse_pass(origin, dx[idx], dz[idx], dy[idx], plan_len[idx], terrain)
+    idx = idx[survivors]
+    if idx.size == 0:
+        return blocked
+
     dx = dx[idx]
     dz = dz[idx]
     dy = dy[idx]
@@ -119,6 +133,51 @@ def terrain_blocks(
 
     blocked[idx] = sub_blocked
     return blocked
+
+
+def _coarse_pass(
+    origin: F64,
+    dx: F64,
+    dz: F64,
+    dy: F64,
+    plan_len: F64,
+    terrain: Terrain,
+) -> np.ndarray:
+    """Boolean mask of rays the coarse bound could NOT clear (the fine march's input).
+
+    Samples at s = 0, c, 2c, ... along the plan-view projection, with c the coarse
+    cell size, plus the endpoint. For each stretch between consecutive samples the
+    ray's lowest height is at one of its ends (it is a straight line), and the
+    terrain under the whole stretch is bounded by the dilated coarse cell at the
+    stretch's midpoint: the stretch is at most c long, so it lies within c of its
+    midpoint, and the dilation covers exactly that. Where lowest > bound on every
+    stretch, no fine sample could ever fall below the surface, so skipping the
+    fine march changes nothing. Where any stretch fails, the fine march decides.
+    """
+    n = dx.size
+    c = terrain.coarse_spacing
+    longest = float(plan_len.max())
+    k = max(1, int(np.ceil(longest / c)))
+    # Fractions along each ray: k+1 sample points, endpoints included, per ray.
+    # Rays shorter than the longest get their samples bunched past t = 1; those
+    # stretches are masked out below rather than wrapped.
+    s = (np.arange(k + 1, dtype=np.float64) * c)[None, :]
+    with np.errstate(divide="ignore", invalid="ignore"):
+        t = np.minimum(s / plan_len[:, None], 1.0)
+
+    sy = origin[1] + t * dy[:, None]
+    lowest = np.minimum(sy[:, :-1], sy[:, 1:])
+
+    tm = 0.5 * (t[:, :-1] + t[:, 1:])
+    mx = origin[0] + tm * dx[:, None]
+    mz = origin[2] + tm * dz[:, None]
+    bound = terrain.coarse_max_at(mx, mz)
+
+    # A stretch that starts at or past the end of the ray has zero length and no
+    # terrain under it; it must not be allowed to fail the test.
+    real = t[:, :-1] < 1.0
+    fails = (lowest <= bound) & real
+    return np.asarray(fails.any(axis=1), dtype=bool).reshape(n)
 
 
 def eval_heights(

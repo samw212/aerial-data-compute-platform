@@ -20,9 +20,14 @@ dependencies = [
 
 [dependency-groups]
 dev = [
-    # The CLI is an app, so the packages never depend on it; it is installed here
-    # so that a development environment has the `groma` command.
+    # The CLI and API are apps, so the packages never depend on them; they are
+    # installed here so that a development environment has the `groma` command
+    # and can run the service.
     "groma-cli",
+    "groma-api",
+    # Starlette's TestClient wants httpx2; the older httpx raises a deprecation
+    # warning, which this suite treats as an error.
+    "httpx2",
     "pytest>=8.0",
     "pytest-cov>=5.0",
     "hypothesis>=6.100",
@@ -42,6 +47,7 @@ groma-recon = { workspace = true }
 groma-tiles = { workspace = true }
 groma-segment = { workspace = true }
 groma-cli = { workspace = true }
+groma-api = { workspace = true }
 
 [tool.pytest.ini_options]
 testpaths = ["tests"]
@@ -97,6 +103,9 @@ known-first-party = [
 # combined condition, and these two files are checks-with-explanations throughout.
 "tests/unit/test_import_graph.py" = ["SIM102"]
 "scripts/author_site_alpha.py" = ["SIM102"]
+# The index page is an inline HTML template; wrapping its markup at 100 columns
+# would only make it harder to read as HTML.
+"apps/api/groma_api/main.py" = ["E501"]
 
 [tool.mypy]
 python_version = "3.12"

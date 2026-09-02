@@ -136,6 +136,51 @@ def test_t5_parity_with_mount_exclusion() -> None:
     assert np.array_equal(fast.count, slow.count)
 
 
+def test_coarse_terrain_pass_never_clears_a_blocked_ray() -> None:
+    """The coarse-to-fine terrain march is exact, on terrain built to break it.
+
+    Seeded random bumps on a slope, with amplitude and wavelength chosen so that
+    plenty of rays fail the coarse bound in one stretch and pass it in another.
+    reference.py has no coarse pass at all, so any ray the coarse bound wrongly
+    clears shows up here as a count mismatch.
+    """
+    from groma_coverage.types import Terrain
+
+    rng = np.random.default_rng(7)
+    spacing = 0.5
+    nx, nz = 121, 101
+    xs = np.arange(nx) * spacing - 30.0
+    zs = np.arange(nz) * spacing - 25.0
+    xg, zg = np.meshgrid(xs, zs)
+    heights = (
+        0.05 * xg
+        + 1.2 * np.sin(xg * 0.9) * np.cos(zg * 0.7)
+        + 2.5 * np.exp(-((xg - 2.0) ** 2) / 8.0)  # a 2.5 m ridge across the middle
+        + rng.normal(0.0, 0.15, size=xg.shape)
+    ).astype(np.float32)
+    terrain = Terrain(x_min=-30.0, z_min=-25.0, spacing=spacing, heights=heights)
+
+    cams = [
+        aimed_camera((-18.0, 6.0, -14.0), tilt_deg=12.0, id="c0"),
+        aimed_camera((17.0, 5.0, 15.0), tilt_deg=9.0, id="c1"),
+    ]
+    grid = Grid(x_min=-20.0, x_max=20.0, z_min=-20.0, z_max=20.0, spacing=1.0)
+
+    fast = compute_coverage(cams, [], grid, terrain, 1.6)
+    slow = compute_coverage_reference(cams, [], grid, terrain, 1.6)
+    assert_sees_something(fast)
+
+    # The terrain must actually block a good share of what the cameras would
+    # otherwise see, or a coarse pass that cleared everything would pass here.
+    # Measured against the reference, which has no coarse pass to be wrong.
+    bare = compute_coverage(cams, [], grid, None, 1.6)
+    shadowed = (bare.count > 0) & (slow.count == 0)
+    assert np.count_nonzero(shadowed) > 0.10 * np.count_nonzero(bare.count > 0)
+
+    assert np.array_equal(fast.count, slow.count)
+    assert np.max(np.abs(fast.ppm - slow.ppm)) < 1e-4
+
+
 def test_broad_phase_never_discards_a_real_hit() -> None:
     """The broad phase is an optimisation, and must change no result.
 

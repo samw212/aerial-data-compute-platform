@@ -180,20 +180,6 @@ class SegmentBatch:
             y_high=np.maximum(origin[1], ty),
         )
 
-    def take(self, idx: np.ndarray) -> SegmentBatch:
-        """A batch restricted to a subset of the targets."""
-        return SegmentBatch(
-            origin=self.origin,
-            targets=self.targets[idx],
-            ax=self.ax,
-            az=self.az,
-            abx=self.abx[idx],
-            abz=self.abz[idx],
-            inv_len2=self.inv_len2[idx],
-            y_low=self.y_low[idx],
-            y_high=self.y_high[idx],
-        )
-
 
 @dataclass(frozen=True)
 class PreparedOccluder:

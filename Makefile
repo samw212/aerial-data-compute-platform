@@ -30,7 +30,16 @@ test-all:  ## Unit + integration (testcontainers) + Playwright e2e
 lint:  ## ruff + mypy (+ tsc once apps/web exists)
 	$(PY) ruff check .
 	$(PY) ruff format --check .
-	$(PY) mypy packages apps/cli
+	$(PY) mypy packages apps/cli apps/api
+
+.PHONY: serve
+serve:  ## Run the coverage service locally on http://127.0.0.1:6006
+	GROMA_SITE_FIXTURE=fixtures/sites/site_alpha.json \
+	$(PY) uvicorn groma_api.main:app --host 127.0.0.1 --port 6006 --reload
+
+.PHONY: deploy-autodl
+deploy-autodl:  ## Deploy to an AutoDL instance: make deploy-autodl SSH="ssh -p 12345 root@host"
+	bash deploy/autodl/deploy.sh "$(SSH)"
 
 .PHONY: format
 format:  ## Apply ruff formatting and import order

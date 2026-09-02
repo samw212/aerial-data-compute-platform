@@ -1,7 +1,7 @@
 [project]
 name = "groma-api"
 version = "0.1.0"
-description = "FastAPI application. Lands with M4."
+description = "FastAPI service. Serves the M1 kernel now; the full API of build-spec 7 lands with M4."
 requires-python = ">=3.12"
 dependencies = [
     "groma-contracts",
@@ -9,6 +9,12 @@ dependencies = [
     "groma-coverage",
     "fastapi>=0.111",
     "uvicorn[standard]>=0.30",
+]
+
+[project.optional-dependencies]
+# The database layer, build-spec 5. Held back until M4 so that the deployable
+# service today has the same footprint as the kernel: no PostGIS, no Redis.
+m4 = [
     "sqlalchemy>=2.0",
     "alembic>=1.13",
     "psycopg[binary]>=3.1",

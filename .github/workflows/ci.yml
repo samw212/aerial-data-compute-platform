@@ -26,7 +26,9 @@ jobs:
       - name: ruff format
         run: uv run ruff format --check .
       - name: mypy
-        run: uv run mypy packages apps/cli
+        run: uv run mypy packages apps/cli apps/api
+      - name: Deploy scripts parse
+        run: bash -n deploy/autodl/bootstrap.sh && bash -n deploy/autodl/groma-ctl && bash -n deploy/autodl/deploy.sh
 
   test:
     runs-on: ubuntu-latest

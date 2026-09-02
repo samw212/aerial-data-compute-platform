@@ -107,7 +107,23 @@ it. See `docs/README.md`.
   milestone, so the workspace installs and the kernel suite runs with no GDAL, no PDAL
   and no CUDA.
 
-## Two performance defects found and fixed in M1
+## Deployment (ahead of M15, deliberately small)
+
+`deploy/autodl/` holds a one-command installer for an AutoDL instance and the
+`groma-ctl` management command; `docs/runbook-autodl.md` is the operator's guide,
+written for someone with no server background. What is deployed is `apps/api`, a
+stateless FastAPI service over the M1 kernel: health, kernel version, coverage
+statistics and a DORI heatmap, plus an index page. It binds AutoDL's exposed port
+6006 directly rather than sitting behind nginx, because until the M3 frontend
+exists there is nothing for nginx to serve. The build-spec 7 API replaces these
+routes when M4 lands; only the heatmap encoder is meant to survive.
+
+This sandbox cannot open SSH connections (its egress is HTTPS on port 443 only), so
+the deployment was **not executed against the target instance from here**. The
+installer was exercised end to end on a local clone instead — install, tests,
+supervisord, health check — and the runbook tells the operator how to run it.
+
+## Three performance defects found and fixed in M1
 
 The benchmark first came in at 12.4 s against the 800 ms budget. Both causes were
 real:
@@ -123,6 +139,16 @@ real:
 That reached 777 ms — a pass, but with 3% headroom, which would flake on any slower
 machine. Hoisting the camera-to-target segment geometry out of the per-occluder
 broad phase (`SegmentBatch`) took it to **505 ms**.
+
+3. The review pass then measured the benchmark on a 3% slope instead of flat
+   ground: **6.6 s**. The "highest point in the heightfield" rejection is useless
+   on a slope, because the top of the slope is the maximum, and every real DTM has
+   some slope. The march is now coarse-to-fine: a max-pooled, dilated copy of the
+   heightfield (`Terrain.coarse_max_at`) lets a stretch of ray be cleared exactly
+   with one lookup per sixteen cells, and only rays that fail that go to the fine
+   march. Sloped terrain: **6.6 s → 0.6 s.** Still exact — T5, T10, T11 and a new
+   parity test on seeded random terrain with a ridge all agree with `reference.py`
+   cell for cell.
 
 ## Where the next session starts
 

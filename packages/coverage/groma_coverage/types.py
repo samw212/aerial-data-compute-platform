@@ -68,12 +68,51 @@ class Occluder:
         return self.porosity >= 1.0
 
 
-@dataclass(frozen=True)
+COARSE_BLOCK = 16
+"""Terrain cells per side of one cell of the max-pooled coarse heightfield."""
+
+
+def _dilated_block_max(heights: F64, block: int) -> F64:
+    """Max-pool a heightfield into blocks, then dilate by one block in every direction.
+
+    The result is a conservative upper bound: for any point (x, z), the coarse
+    cell containing it holds a value at least as high as every heightfield node
+    within one block of that cell — which is more than the four nodes bilinear
+    interpolation would read anywhere inside it. The dilation is what makes a
+    single lookup at a ray sample bound the terrain along the whole stretch of
+    ray between that sample and the next.
+    """
+    nz, nx = heights.shape
+    nzc = -(-nz // block)
+    nxc = -(-nx // block)
+    padded = np.full((nzc * block, nxc * block), -np.inf, dtype=np.float64)
+    padded[:nz, :nx] = heights
+    pooled: F64 = padded.reshape(nzc, block, nxc, block).max(axis=(1, 3))
+
+    dilated: F64 = pooled.copy()
+    for dj in (-1, 0, 1):
+        for di in (-1, 0, 1):
+            if dj == 0 and di == 0:
+                continue
+            shifted = np.full_like(pooled, -np.inf)
+            src_j = slice(max(0, -dj), nzc - max(0, dj))
+            dst_j = slice(max(0, dj), nzc - max(0, -dj))
+            src_i = slice(max(0, -di), nxc - max(0, di))
+            dst_i = slice(max(0, di), nxc - max(0, -di))
+            shifted[dst_j, dst_i] = pooled[src_j, src_i]
+            np.maximum(dilated, shifted, out=dilated)
+    return dilated
+
+
+@dataclass(frozen=True, eq=False)
 class Terrain:
     """The DTM as a heightfield in local ENU. Occludes, and defines eval height.
 
     `heights[j, i]` is the ground Y at x = x_min + i*spacing, z = z_min + j*spacing.
     Row 0 is z_min and column 0 is x_min, matching Grid.centres().
+
+    `eq=False` because the generated equality would compare the height arrays
+    with `==`, and NumPy raises on that rather than answering.
     """
 
     x_min: float
@@ -81,8 +120,9 @@ class Terrain:
     spacing: float
     heights: F32
 
-    _h64: F64 = field(init=False, repr=False, compare=False)
-    _y_max: float = field(init=False, repr=False, compare=False)
+    _h64: F64 = field(init=False, repr=False)
+    _y_max: float = field(init=False, repr=False)
+    _coarse: F64 = field(init=False, repr=False)
 
     def __post_init__(self) -> None:
         if self.heights.ndim != 2:
@@ -94,8 +134,10 @@ class Terrain:
         # it here rather than inside height_at matters: that method is called on
         # every step of every ray march, and an astype() there copies the whole
         # grid each time. It cost 1.1 s of a 15 s benchmark run.
-        object.__setattr__(self, "_h64", self.heights.astype(np.float64))
+        h64 = self.heights.astype(np.float64)
+        object.__setattr__(self, "_h64", h64)
         object.__setattr__(self, "_y_max", float(self.heights.max()))
+        object.__setattr__(self, "_coarse", _dilated_block_max(h64, COARSE_BLOCK))
 
     @property
     def y_max(self) -> float:
@@ -105,6 +147,27 @@ class Terrain:
         is the cheapest exact rejection there is.
         """
         return self._y_max
+
+    @property
+    def coarse_spacing(self) -> float:
+        return self.spacing * COARSE_BLOCK
+
+    def coarse_max_at(self, x: npt.ArrayLike, z: npt.ArrayLike) -> F64:
+        """An upper bound on the ground height within one coarse cell of (x, z).
+
+        Reads the max-pooled, dilated heightfield: each coarse cell holds the
+        highest node in its own block and the eight blocks around it. So the value
+        bounds the bilinear terrain surface everywhere within `coarse_spacing` of
+        the query, which is what lets a whole stretch of ray be cleared with one
+        lookup. Never an underestimate; see terrain.terrain_blocks.
+        """
+        xs = np.asarray(x, dtype=np.float64)
+        zs = np.asarray(z, dtype=np.float64)
+        nzc, nxc = self._coarse.shape
+        i = np.clip(np.floor((xs - self.x_min) / self.coarse_spacing), 0, nxc - 1).astype(np.intp)
+        j = np.clip(np.floor((zs - self.z_min) / self.coarse_spacing), 0, nzc - 1).astype(np.intp)
+        bound: F64 = np.asarray(self._coarse[j, i], dtype=np.float64)
+        return bound
 
     @property
     def nz(self) -> int:
@@ -218,9 +281,9 @@ class Grid:
         return np.meshgrid(xs, zs)
 
 
-@dataclass
+@dataclass(eq=False)
 class CoverageResult:
-    """One coverage grid.
+    """One coverage grid. `eq=False` for the same reason as Terrain.
 
     `ppm` is the best pixel density any camera achieves at that cell; 0 means no
     sightline from anything. `eval_y` records the absolute height actually
