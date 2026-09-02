@@ -79,14 +79,14 @@ fi
 # ---------------------------------------------------------------- environment
 say "Installing Python 3.12 and the project's dependencies"
 cd "$APP"
-uv python install 3.12 >/dev/null 2>&1 || true
-uv sync --dev --frozen >/dev/null
+uv python install 3.12 --quiet >/dev/null 2>&1 || true
+uv sync --dev --frozen --quiet
 ok "environment ready in $APP/.venv"
 
 # ------------------------------------------------------------------------ tests
 if [ "${GROMA_SKIP_TESTS:-0}" != "1" ]; then
   say "Running the test suite (this is how you know the install is good)"
-  if uv run pytest tests/unit tests/golden -m "not slow and not bench" -q >"$LOGS/tests.log" 2>&1; then
+  if uv run pytest tests/unit tests/golden -m "not slow and not bench" >"$LOGS/tests.log" 2>&1; then
     ok "$(tail -n 1 "$LOGS/tests.log")"
   else
     tail -n 30 "$LOGS/tests.log" >&2
@@ -97,7 +97,7 @@ fi
 # ------------------------------------------------------------------ supervisor
 say "Installing supervisord (keeps the service running)"
 if ! uv tool list 2>/dev/null | grep -q '^supervisor '; then
-  uv tool install supervisor >/dev/null
+  uv tool install supervisor --quiet
 fi
 ok "supervisord $(uv tool run --from supervisor supervisord --version)"
 

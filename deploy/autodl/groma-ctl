@@ -114,7 +114,7 @@ cmd_follow() {
 
 cmd_test() {
   cd "$APP"
-  uv run pytest tests/unit tests/golden -m "not slow and not bench" -q
+  uv run pytest tests/unit tests/golden -m "not slow and not bench"
 }
 
 cmd_update() {
@@ -149,7 +149,7 @@ cmd_update() {
 }
 
 cmd_coverage() { cd "$APP" && uv run groma coverage "$@"; }
-cmd_bench()    { cd "$APP" && uv run pytest tests/unit/test_kernel_bench.py -m bench -s -q; }
+cmd_bench()    { cd "$APP" && uv run pytest tests/unit/test_kernel_bench.py -m bench -s; }
 
 cmd_where() {
   cat <<EOF
