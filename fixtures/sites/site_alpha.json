@@ -1,0 +1,273 @@
+{
+  "name": "site_alpha",
+  "srid": 2326,
+  "origin": {
+    "srid": 2326,
+    "x": 833000.0,
+    "y": 817000.0,
+    "z": 0.0,
+    "height_datum": "orthometric_mpd"
+  },
+  "x_min": -66.0,
+  "x_max": 66.0,
+  "z_min": -41.0,
+  "z_max": 41.0,
+  "pitch": {
+    "half_x": 52.5,
+    "half_z": 34.0,
+    "nominal_length_m": 105.0,
+    "nominal_width_m": 68.0
+  },
+  "structures": [
+    {
+      "name": "mast_sw",
+      "cls": "pole",
+      "primitive": {
+        "kind": "cylinder",
+        "cx": -57.0,
+        "cz": -37.0,
+        "r": 0.28,
+        "y0": 0.0,
+        "y1": 15.2
+      },
+      "porosity": 0.0,
+      "mountable": true,
+      "seasonal": false
+    },
+    {
+      "name": "mast_se",
+      "cls": "pole",
+      "primitive": {
+        "kind": "cylinder",
+        "cx": 57.0,
+        "cz": -37.0,
+        "r": 0.28,
+        "y0": 0.0,
+        "y1": 15.2
+      },
+      "porosity": 0.0,
+      "mountable": true,
+      "seasonal": false
+    },
+    {
+      "name": "mast_ne",
+      "cls": "pole",
+      "primitive": {
+        "kind": "cylinder",
+        "cx": 57.0,
+        "cz": 37.0,
+        "r": 0.28,
+        "y0": 0.0,
+        "y1": 15.2
+      },
+      "porosity": 0.0,
+      "mountable": true,
+      "seasonal": false
+    },
+    {
+      "name": "mast_nw",
+      "cls": "pole",
+      "primitive": {
+        "kind": "cylinder",
+        "cx": -57.0,
+        "cz": 37.0,
+        "r": 0.28,
+        "y0": 0.0,
+        "y1": 15.2
+      },
+      "porosity": 0.0,
+      "mountable": true,
+      "seasonal": false
+    },
+    {
+      "name": "mast_mid_s",
+      "cls": "pole",
+      "primitive": {
+        "kind": "cylinder",
+        "cx": 0.0,
+        "cz": -38.0,
+        "r": 0.28,
+        "y0": 0.0,
+        "y1": 15.2
+      },
+      "porosity": 0.0,
+      "mountable": true,
+      "seasonal": false
+    },
+    {
+      "name": "mast_mid_n",
+      "cls": "pole",
+      "primitive": {
+        "kind": "cylinder",
+        "cx": 0.0,
+        "cz": 38.0,
+        "r": 0.28,
+        "y0": 0.0,
+        "y1": 15.2
+      },
+      "porosity": 0.0,
+      "mountable": true,
+      "seasonal": false
+    },
+    {
+      "name": "fence_s",
+      "cls": "fence",
+      "primitive": {
+        "kind": "polyline",
+        "points": [
+          [
+            -64.5,
+            -40.5
+          ],
+          [
+            64.5,
+            -40.5
+          ]
+        ],
+        "y0": 0.0,
+        "y1": 2.4,
+        "thickness": 0.12
+      },
+      "porosity": 0.85,
+      "mountable": false,
+      "seasonal": false
+    },
+    {
+      "name": "fence_e",
+      "cls": "fence",
+      "primitive": {
+        "kind": "polyline",
+        "points": [
+          [
+            64.5,
+            -40.5
+          ],
+          [
+            64.5,
+            40.5
+          ]
+        ],
+        "y0": 0.0,
+        "y1": 2.4,
+        "thickness": 0.12
+      },
+      "porosity": 0.85,
+      "mountable": false,
+      "seasonal": false
+    },
+    {
+      "name": "fence_n",
+      "cls": "fence",
+      "primitive": {
+        "kind": "polyline",
+        "points": [
+          [
+            64.5,
+            40.5
+          ],
+          [
+            -64.5,
+            40.5
+          ]
+        ],
+        "y0": 0.0,
+        "y1": 2.4,
+        "thickness": 0.12
+      },
+      "porosity": 0.85,
+      "mountable": false,
+      "seasonal": false
+    },
+    {
+      "name": "fence_w",
+      "cls": "fence",
+      "primitive": {
+        "kind": "polyline",
+        "points": [
+          [
+            -64.5,
+            40.5
+          ],
+          [
+            -64.5,
+            -40.5
+          ]
+        ],
+        "y0": 0.0,
+        "y1": 2.4,
+        "thickness": 0.12
+      },
+      "porosity": 0.85,
+      "mountable": false,
+      "seasonal": false
+    },
+    {
+      "name": "stand_south",
+      "cls": "stand",
+      "primitive": {
+        "kind": "box",
+        "cx": 0.0,
+        "cy": 3.0,
+        "cz": -37.0,
+        "hx": 22.0,
+        "hy": 3.0,
+        "hz": 3.0,
+        "yaw": 0.0
+      },
+      "porosity": 0.0,
+      "mountable": true,
+      "seasonal": false
+    },
+    {
+      "name": "pavilion",
+      "cls": "building",
+      "primitive": {
+        "kind": "box",
+        "cx": -58.0,
+        "cy": 2.25,
+        "cz": 0.0,
+        "hx": 4.0,
+        "hy": 2.25,
+        "hz": 9.0,
+        "yaw": 0.0
+      },
+      "porosity": 0.0,
+      "mountable": true,
+      "seasonal": false
+    },
+    {
+      "name": "tree_east",
+      "cls": "vegetation",
+      "primitive": {
+        "kind": "box",
+        "cx": 44.0,
+        "cy": 4.0,
+        "cz": 37.3,
+        "hx": 3.2,
+        "hy": 4.0,
+        "hz": 3.2,
+        "yaw": 0.0
+      },
+      "porosity": 0.0,
+      "mountable": false,
+      "seasonal": true
+    },
+    {
+      "name": "tree_west",
+      "cls": "vegetation",
+      "primitive": {
+        "kind": "box",
+        "cx": -20.0,
+        "cy": 4.0,
+        "cz": 37.3,
+        "hx": 3.2,
+        "hy": 4.0,
+        "hz": 3.2,
+        "yaw": 0.0
+      },
+      "porosity": 0.0,
+      "mountable": false,
+      "seasonal": true
+    }
+  ]
+}
