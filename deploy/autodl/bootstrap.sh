@@ -23,6 +23,16 @@
 #   GROMA_PORT      port to serve on                 (default 6006, AutoDL's exposed port)
 #   GROMA_SKIP_TESTS=1   skip the test suite (not recommended)
 #
+# Slow network (common from mainland China without full acceleration coverage):
+#
+#   GROMA_PYPI_MIRROR   a PyPI-compatible index URL for package downloads, e.g.
+#                       https://pypi.tuna.tsinghua.edu.cn/simple . Does not
+#                       speed up the Python interpreter download itself (that
+#                       comes from GitHub releases, not PyPI) — for that, make
+#                       sure /etc/network_turbo exists and gets sourced above,
+#                       or wait it out; it is usually a one-off per instance
+#                       image, cached afterwards.
+#
 # Private repository:
 #
 #   GROMA_GITHUB_TOKEN   a GitHub token with read access to the repository's
@@ -112,9 +122,24 @@ fi
 
 # ---------------------------------------------------------------- environment
 say "Installing Python 3.12 and the project's dependencies"
+echo "    First run only: this downloads a Python 3.12 interpreter (if the"
+echo "    instance doesn't already have one) plus every package this project"
+echo "    needs. It can take a few minutes on a slow connection. Progress"
+echo "    below is uv's own output, not ours — a quiet terminal here for a"
+echo "    while is normal; a completely blank one for over five minutes on a"
+echo "    fresh instance usually means the network to PyPI or GitHub is slow"
+echo "    or blocked (GROMA_PYPI_MIRROR helps with PyPI; see the top of this"
+echo "    script)."
 cd "$APP"
-uv python install 3.12 --quiet >/dev/null 2>&1 || true
-uv sync --dev --frozen --quiet
+if [ -n "${GROMA_PYPI_MIRROR:-}" ]; then
+  export UV_INDEX_URL="$GROMA_PYPI_MIRROR"
+  ok "using PyPI mirror $GROMA_PYPI_MIRROR"
+fi
+# `uv sync` installs a matching Python interpreter itself if none is found, so
+# a separate `uv python install` step is redundant — it was also silenced
+# (>/dev/null 2>&1), which meant this entire step showed no output at all for
+# however long both downloads took, indistinguishable from a genuine hang.
+uv sync --dev --frozen
 ok "environment ready in $APP/.venv"
 
 # ------------------------------------------------------------------------ tests

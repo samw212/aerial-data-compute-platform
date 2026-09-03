@@ -133,7 +133,7 @@ cmd_update() {
     git --no-pager log --oneline "$before..$after" | sed 's/^/    /'
   fi
   echo "syncing dependencies ..."
-  uv sync --dev --frozen >/dev/null
+  uv sync --dev --frozen
   echo "running tests ..."
   if cmd_test; then
     sed -e "s#__GROMA_HOME__#$GROMA_HOME#g" -e "s#--port 6006#--port $GROMA_PORT#" \

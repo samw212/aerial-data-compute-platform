@@ -416,6 +416,38 @@ The service is still running on the old code and is fine. Someone has pushed
 something that does not pass; tell them, and include the last twenty lines it
 printed. Do not force it.
 
+**It looks stuck at "Installing Python 3.12 and the project's dependencies".**
+This is almost always still working, not frozen — it is downloading a Python
+interpreter and every package the project needs, which on a first run and a slow
+connection can take several minutes, and it prints its own progress rather than
+ours. Open a **second** terminal (do not close the stuck one) and connect to the
+same instance again, then run:
+
+```
+ps aux | grep -E 'uv|python3.12' | grep -v grep
+```
+
+If that shows a process, it is working — leave it. Give it up to ten minutes on a
+slow connection before deciding otherwise. If you want to check the network itself
+while you wait:
+
+```
+curl -m 6 -o /dev/null -s -w 'PyPI:   %{http_code}  %{time_total}s\n' https://pypi.org
+curl -m 6 -o /dev/null -s -w 'GitHub: %{http_code}  %{time_total}s\n' https://github.com
+```
+A code other than `200`, or several seconds where it should be under one, points at
+the network rather than the install itself. If it is genuinely stuck (the `ps`
+command shows nothing at all), press `Ctrl + C` in the first terminal — the install
+is safe to re-run — and retry with a PyPI mirror, which is the standard fix for a
+slow connection to PyPI from mainland China:
+
+```
+GROMA_PYPI_MIRROR=https://pypi.tuna.tsinghua.edu.cn/simple bash bootstrap.sh
+```
+
+(That speeds up package downloads only. The Python interpreter itself comes from
+GitHub, not PyPI, and is a one-off per instance image — later runs skip it.)
+
 **The install or update is very slow or fails downloading.**
 GitHub and Python's package index are slow from some networks. Run
 `source /etc/network_turbo` and try again. The install script does this on its own,
