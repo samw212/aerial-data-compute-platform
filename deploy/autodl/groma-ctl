@@ -1,0 +1,180 @@
+#!/usr/bin/env bash
+# groma-ctl: the one command for running Groma on an AutoDL instance.
+#
+#   groma-ctl status      is the service running, and since when
+#   groma-ctl health      ask the service itself whether it is well
+#   groma-ctl start       start it (safe if already running)
+#   groma-ctl stop        stop it
+#   groma-ctl restart     stop, then start
+#   groma-ctl logs [N]    show the last N lines of the service log (default 60)
+#   groma-ctl follow      watch the log live; press Ctrl-C to stop watching
+#   groma-ctl update      fetch the latest code, run the tests, restart if green
+#   groma-ctl test        run the test suite without touching the service
+#   groma-ctl coverage    print coverage figures for site_alpha in the terminal
+#   groma-ctl bench       run the kernel performance benchmark
+#   groma-ctl where       print the paths this install uses
+#   groma-ctl help        this text
+#
+# Installed by deploy/autodl/bootstrap.sh, which also writes the small file of
+# settings it reads (GROMA_HOME/run/env).
+
+set -euo pipefail
+
+# Settings written by bootstrap.sh: GROMA_HOME and GROMA_PORT. Looked for in
+# /etc first so that an install anywhere other than the default location is
+# still found without the operator having to know where it went.
+for candidate in "${GROMA_ENV_FILE:-}" /etc/groma.env /root/autodl-tmp/groma/run/env; do
+  if [ -n "$candidate" ] && [ -f "$candidate" ]; then
+    # shellcheck disable=SC1090
+    source "$candidate"
+    break
+  fi
+done
+GROMA_HOME="${GROMA_HOME:-/root/autodl-tmp/groma}"
+GROMA_PORT="${GROMA_PORT:-6006}"
+
+APP="$GROMA_HOME/app"
+LOGS="$GROMA_HOME/logs"
+RUN="$GROMA_HOME/run"
+CONF="$RUN/supervisord.conf"
+export PATH="$HOME/.local/bin:$PATH"
+
+red()   { printf '\033[1;31m%s\033[0m\n' "$*"; }
+green() { printf '\033[1;32m%s\033[0m\n' "$*"; }
+
+sv()   { uv tool run --from supervisor supervisord "$@"; }
+svc()  { uv tool run --from supervisor supervisorctl -c "$CONF" "$@"; }
+
+supervisor_running() {
+  [ -f "$RUN/supervisord.pid" ] && kill -0 "$(cat "$RUN/supervisord.pid")" 2>/dev/null
+}
+
+cmd_start() {
+  if supervisor_running; then
+    svc start groma-api >/dev/null 2>&1 || true
+  else
+    sv -c "$CONF"
+    sleep 2
+  fi
+  cmd_status
+}
+
+cmd_stop() {
+  if supervisor_running; then
+    svc stop groma-api >/dev/null 2>&1 || true
+    svc shutdown >/dev/null 2>&1 || true
+    green "stopped"
+  else
+    echo "already stopped"
+  fi
+}
+
+cmd_restart() {
+  if supervisor_running; then
+    svc restart groma-api
+    sleep 2
+    cmd_status
+  else
+    cmd_start
+  fi
+}
+
+cmd_status() {
+  if supervisor_running; then
+    svc status groma-api
+  else
+    red "not running (supervisord is not up). Start it with: groma-ctl start"
+    return 1
+  fi
+}
+
+cmd_health() {
+  local tries=15 body
+  for _ in $(seq "$tries"); do
+    if body=$(curl -fsS --max-time 3 "http://127.0.0.1:$GROMA_PORT/api/health" 2>/dev/null); then
+      green "healthy: $body"
+      return 0
+    fi
+    sleep 1
+  done
+  red "the service on port $GROMA_PORT is not answering (tried for ${tries}s). Try: groma-ctl logs"
+  return 1
+}
+
+cmd_logs() {
+  local n="${1:-60}"
+  [ -f "$LOGS/groma-api.log" ] || { echo "no log yet at $LOGS/groma-api.log"; return 0; }
+  tail -n "$n" "$LOGS/groma-api.log"
+}
+
+cmd_follow() {
+  echo "watching $LOGS/groma-api.log — press Ctrl-C to stop"
+  tail -n 20 -F "$LOGS/groma-api.log"
+}
+
+cmd_test() {
+  cd "$APP"
+  uv run pytest tests/unit tests/golden -m "not slow and not bench"
+}
+
+cmd_update() {
+  cd "$APP"
+  local before after branch
+  branch=$(git rev-parse --abbrev-ref HEAD)
+  before=$(git rev-parse --short HEAD)
+  echo "fetching branch $branch ..."
+  git fetch --quiet origin "$branch"
+  git checkout --quiet -B "$branch" "origin/$branch"
+  after=$(git rev-parse --short HEAD)
+  if [ "$before" = "$after" ]; then
+    echo "already up to date at $after"
+  else
+    echo "updated $before -> $after"
+    git --no-pager log --oneline "$before..$after" | sed 's/^/    /'
+  fi
+  echo "syncing dependencies ..."
+  uv sync --dev --frozen >/dev/null
+  echo "running tests ..."
+  if cmd_test; then
+    sed -e "s#__GROMA_HOME__#$GROMA_HOME#g" -e "s#--port 6006#--port $GROMA_PORT#" \
+      "$APP/deploy/autodl/supervisord.conf" > "$CONF"
+    install -m 0755 "$APP/deploy/autodl/groma-ctl" /usr/local/bin/groma-ctl
+    cmd_restart
+    cmd_health
+  else
+    red "tests failed; the running service was NOT restarted and is still on the old code."
+    red "Roll back with:  cd $APP && git checkout $before && groma-ctl restart"
+    return 1
+  fi
+}
+
+cmd_coverage() { cd "$APP" && uv run groma coverage "$@"; }
+cmd_bench()    { cd "$APP" && uv run pytest tests/unit/test_kernel_bench.py -m bench -s; }
+
+cmd_where() {
+  cat <<EOF
+GROMA_HOME  $GROMA_HOME
+code        $APP   (branch $(git -C "$APP" rev-parse --abbrev-ref HEAD 2>/dev/null || echo '?'), commit $(git -C "$APP" rev-parse --short HEAD 2>/dev/null || echo '?'))
+logs        $LOGS
+service     http://127.0.0.1:$GROMA_PORT   (health: /api/health)
+EOF
+}
+
+cmd_help() { sed -n '2,20p' "$0" | sed 's/^# \{0,1\}//'; }
+
+case "${1:-help}" in
+  start)    cmd_start ;;
+  stop)     cmd_stop ;;
+  restart)  cmd_restart ;;
+  status)   cmd_status ;;
+  health)   cmd_health ;;
+  logs)     shift; cmd_logs "$@" ;;
+  follow)   cmd_follow ;;
+  update)   cmd_update ;;
+  test)     cmd_test ;;
+  coverage) shift; cmd_coverage "$@" ;;
+  bench)    cmd_bench ;;
+  where)    cmd_where ;;
+  help|-h|--help) cmd_help ;;
+  *) red "unknown command: $1"; cmd_help; exit 2 ;;
+esac

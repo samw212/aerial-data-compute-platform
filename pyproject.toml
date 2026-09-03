@@ -1,0 +1,133 @@
+[project]
+name = "groma"
+version = "0.1.0"
+description = "Drone photogrammetry to 3D site model to CCTV coverage planning"
+requires-python = ">=3.12"
+dependencies = [
+    "groma-contracts",
+    "groma-geo",
+    "groma-coverage",
+    # Skeletons for the milestones still to come. They are installed by default so
+    # that T14 can assert the M0 criterion — contracts importable from every
+    # package — for real rather than for the three that happen to be built. Their
+    # heavy dependencies live in per-milestone extras on each package, so this
+    # stays installable with no GDAL, no PDAL and no CUDA.
+    "groma-capture",
+    "groma-recon",
+    "groma-tiles",
+    "groma-segment",
+]
+
+[dependency-groups]
+dev = [
+    # The CLI and API are apps, so the packages never depend on them; they are
+    # installed here so that a development environment has the `groma` command
+    # and can run the service.
+    "groma-cli",
+    "groma-api",
+    # Starlette's TestClient wants httpx2; the older httpx raises a deprecation
+    # warning, which this suite treats as an error.
+    "httpx2",
+    "pytest>=8.0",
+    "pytest-cov>=5.0",
+    "hypothesis>=6.100",
+    "ruff>=0.6",
+    "mypy>=1.11",
+]
+
+[tool.uv.workspace]
+members = ["packages/*", "apps/api", "apps/worker", "apps/cli"]
+
+[tool.uv.sources]
+groma-contracts = { workspace = true }
+groma-geo = { workspace = true }
+groma-coverage = { workspace = true }
+groma-capture = { workspace = true }
+groma-recon = { workspace = true }
+groma-tiles = { workspace = true }
+groma-segment = { workspace = true }
+groma-cli = { workspace = true }
+groma-api = { workspace = true }
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+pythonpath = ["."]
+addopts = "-q --strict-markers --strict-config"
+markers = [
+    "slow: excluded from the unit suite; must stay under 5 seconds (build-spec 18)",
+    "bench: performance benchmarks, run by `make kernel-bench`",
+]
+filterwarnings = ["error"]
+
+[tool.ruff]
+line-length = 100
+target-version = "py312"
+extend-exclude = [".venv", "migrations"]
+
+[tool.ruff.lint]
+select = [
+    "E",    # pycodestyle
+    "F",    # pyflakes
+    "I",    # isort
+    "N",    # pep8-naming
+    "UP",   # pyupgrade
+    "B",    # bugbear
+    "SIM",  # simplify
+    "RUF",
+]
+ignore = [
+    "E741",  # ambiguous names: l, I, O. The geometry maths reads better with them.
+]
+
+[tool.ruff.lint.isort]
+# The workspace packages are installed into the environment, so without this
+# ruff sorts them as third-party and every module in the repo disagrees with
+# every other about where its own imports belong.
+known-first-party = [
+    "groma_contracts",
+    "groma_geo",
+    "groma_coverage",
+    "groma_capture",
+    "groma_recon",
+    "groma_tiles",
+    "groma_segment",
+    "groma_api",
+    "groma_worker",
+    "groma_cli",
+    "tests",
+]
+
+[tool.ruff.lint.per-file-ignores]
+"tests/*" = ["E501"]
+# Nested conditionals whose branches carry separate reasons read better than one
+# combined condition, and these two files are checks-with-explanations throughout.
+"tests/unit/test_import_graph.py" = ["SIM102"]
+"scripts/author_site_alpha.py" = ["SIM102"]
+# The index page is an inline HTML template; wrapping its markup at 100 columns
+# would only make it harder to read as HTML.
+"apps/api/groma_api/main.py" = ["E501"]
+
+[tool.mypy]
+python_version = "3.12"
+strict = true
+warn_unreachable = true
+plugins = ["pydantic.mypy"]
+mypy_path = [
+    "packages/contracts",
+    "packages/geo",
+    "packages/coverage",
+    "packages/capture",
+    "packages/recon",
+    "packages/tiles",
+    "packages/segment",
+]
+exclude = ["^\\.venv/", "^migrations/"]
+
+[[tool.mypy.overrides]]
+module = ["tests.*", "scripts.*"]
+strict = false
+disallow_untyped_defs = false
+
+[tool.coverage.run]
+branch = true
+source = ["packages"]

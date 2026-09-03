@@ -1,0 +1,21 @@
+[project]
+name = "groma-cli"
+version = "0.1.0"
+description = "The groma command line: seed, coverage, bench."
+requires-python = ">=3.12"
+dependencies = [
+    "groma-contracts",
+    "groma-geo",
+    "groma-coverage",
+    "typer>=0.12",
+]
+
+[project.scripts]
+groma = "groma_cli.main:app"
+
+[build-system]
+requires = ["hatchling"]
+build-backend = "hatchling.build"
+
+[tool.hatch.build.targets.wheel]
+packages = ["groma_cli"]

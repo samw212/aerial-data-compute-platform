@@ -1,0 +1,80 @@
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+env:
+  UV_FROZEN: "1"
+
+jobs:
+  lint:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: astral-sh/setup-uv@v5
+        with:
+          enable-cache: true
+      - run: uv sync --dev
+      - name: ruff check
+        run: uv run ruff check .
+      - name: ruff format
+        run: uv run ruff format --check .
+      - name: mypy
+        run: uv run mypy packages apps/cli apps/api
+      - name: Deploy scripts parse
+        run: bash -n deploy/autodl/bootstrap.sh && bash -n deploy/autodl/groma-ctl && bash -n deploy/autodl/deploy.sh
+
+  test:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: astral-sh/setup-uv@v5
+        with:
+          enable-cache: true
+      - run: uv sync --dev
+
+      - name: Unit and golden suite
+        run: uv run pytest tests/unit tests/golden -m "not slow and not bench"
+
+      # Build spec 18: the unit suite must stay under five seconds. A slow suite
+      # stops being run, and this one is the only thing standing between a
+      # plausible-looking coverage map and a tender document.
+      - name: Unit suite stays under five seconds
+        run: |
+          start=$(date +%s%N)
+          uv run pytest tests/unit tests/golden -m "not slow and not bench" -q
+          elapsed=$(( ($(date +%s%N) - start) / 1000000 ))
+          echo "unit suite: ${elapsed} ms"
+          if [ "$elapsed" -gt 20000 ]; then
+            echo "::error::unit suite took ${elapsed} ms including interpreter start-up"
+            exit 1
+          fi
+
+      - name: The authored fixture regenerates identically
+        run: |
+          uv run python scripts/author_site_alpha.py
+          git diff --exit-code fixtures/sites/site_alpha.json
+
+      - name: TypeScript contracts generate
+        run: uv run python scripts/generate_ts_types.py apps/web/src/api/contracts.ts
+
+  bench:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: astral-sh/setup-uv@v5
+        with:
+          enable-cache: true
+      - run: uv sync --dev
+      # 173,184 cells x 6 cameras x 30 occluders + terrain, under 800 ms
+      # (build spec 6.4). A shared CI runner is slower and noisier than a
+      # workstation, so a failure here is a signal to profile rather than proof
+      # of a regression on its own.
+      - name: Kernel benchmark
+        run: uv run pytest tests/unit/test_kernel_bench.py -m bench -s

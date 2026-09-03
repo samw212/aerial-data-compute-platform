@@ -1,0 +1,19 @@
+[project]
+name = "groma-segment"
+version = "0.1.0"
+description = "Ground separation, clustering, primitive fitting, classification, semantic lift."
+requires-python = ">=3.12"
+# Skeleton only: this package lands with M10. Its heavy dependencies are held in
+# the extra below so that the workspace — and the M1 kernel test suite — installs
+# on a machine with no GDAL, no PDAL and no CUDA.
+dependencies = ["groma-contracts", "groma-geo", "numpy>=1.26"]
+
+[project.optional-dependencies]
+m10 = ["scipy>=1.13", "open3d>=0.18"]
+
+[build-system]
+requires = ["hatchling"]
+build-backend = "hatchling.build"
+
+[tool.hatch.build.targets.wheel]
+packages = ["groma_segment"]

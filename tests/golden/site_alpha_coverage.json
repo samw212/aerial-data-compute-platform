@@ -1,0 +1,41 @@
+{
+  "kernel_version": "1.0.0",
+  "site": "site_alpha",
+  "parameters": {
+    "grid_spacing_m": 0.5,
+    "eval_height_m": 1.6,
+    "foreshorten": true,
+    "terrain": "flat",
+    "include_seasonal": true,
+    "cameras": 4
+  },
+  "cells": 43296,
+  "area_m2": 10824.0,
+  "base": {
+    "tier_pct": {
+      "identify": 0.0,
+      "recognise": 5.6703,
+      "observe": 37.8626,
+      "detect": 92.2395
+    },
+    "blind_pct": 7.749,
+    "redundant_2plus_pct": 48.9953,
+    "mean_ppm": 61.429,
+    "per_camera_unique_m2": {
+      "cam_mast_sw": 1223.0,
+      "cam_mast_se": 1180.25,
+      "cam_mast_ne": 1114.5,
+      "cam_mast_nw": 1164.25
+    }
+  },
+  "with_tents": {
+    "tier_pct": {
+      "identify": 0.0,
+      "recognise": 5.6703,
+      "observe": 27.5938,
+      "detect": 80.5733
+    },
+    "blind_pct": 19.4152,
+    "newly_blind_m2": 1262.75
+  }
+}

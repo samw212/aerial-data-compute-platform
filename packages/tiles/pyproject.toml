@@ -1,0 +1,19 @@
+[project]
+name = "groma-tiles"
+version = "0.1.0"
+description = "Point cloud, mesh, terrain and ortho tiling with local-origin rebasing."
+requires-python = ">=3.12"
+# Skeleton only: this package lands with M9. Its heavy dependencies are held in
+# the extra below so that the workspace — and the M1 kernel test suite — installs
+# on a machine with no GDAL, no PDAL and no CUDA.
+dependencies = ["groma-contracts", "groma-geo", "numpy>=1.26"]
+
+[project.optional-dependencies]
+m9 = ["py3dtiles>=7.0", "rasterio>=1.3"]
+
+[build-system]
+requires = ["hatchling"]
+build-backend = "hatchling.build"
+
+[tool.hatch.build.targets.wheel]
+packages = ["groma_tiles"]
