@@ -82,7 +82,7 @@ cmd_test() {
   cd "$APP"
   # shellcheck disable=SC1091
   set -a; . /etc/groma.env; set +a
-  GROMA_TEST_DATABASE_URL="${GROMA_DATABASE_URL/\/groma/\/groma_test}" uv run pytest tests/unit tests/golden tests/integration -m "not slow and not bench"
+  GROMA_TEST_DATABASE_URL="${GROMA_DATABASE_URL%/groma}/groma_test" uv run pytest tests/unit tests/golden tests/integration -m "not slow and not bench"
 }
 cmd_update() {
   cd "$APP"
