@@ -203,7 +203,14 @@ if [ "${GROMA_SKIP_TESTS:-0}" != "1" ]; then
 fi
 
 say "Starting all services on port $GROMA_PORT"
-groma-ctl start >/dev/null
+# `start` leaves already-running programs alone, so on an update the api and
+# worker would keep serving the previous code. Restart the app programs; the
+# datastores stay up.
+if [ -f "$RUN/supervisord.pid" ] && kill -0 "$(cat "$RUN/supervisord.pid")" 2>/dev/null; then
+  groma-ctl restart api worker nginx >/dev/null
+else
+  groma-ctl start >/dev/null
+fi
 groma-ctl health || { groma-ctl logs api 40 >&2; fail "the service did not come up; see the log above"; }
 
 SEEDED=""
