@@ -194,7 +194,14 @@ def image_footprints(
             {
                 "type": "Feature",
                 "id": str(row.id),
-                "properties": {"filename": row.filename, "state": row.state},
+                # image_id is duplicated into properties on purpose: a MapLibre
+                # filter on ["id"] depends on feature-id promotion, and when that is
+                # not configured the filter matches nothing and fails silently.
+                "properties": {
+                    "image_id": str(row.id),
+                    "filename": row.filename,
+                    "state": row.state,
+                },
                 "geometry": {"type": "Polygon", "coordinates": [ring]},
             }
         )

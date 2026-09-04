@@ -46,8 +46,8 @@ function VenueMap({
             // ground reads brighter.
             { id: "fp-fill", type: "fill", filter: ["==", ["geometry-type"], "Polygon"], paint: { "fill-color": "#5ee7ff", "fill-opacity": 0.06 } },
             { id: "fp-line", type: "line", filter: ["==", ["geometry-type"], "Polygon"], paint: { "line-color": "#5ee7ff", "line-width": 0.5, "line-opacity": 0.45 } },
-            { id: "fp-sel", type: "line", filter: ["all", ["==", ["geometry-type"], "Polygon"], ["==", ["id"], selected ?? ""]], paint: { "line-color": "#ffd166", "line-width": 2 } },
-            { id: "fp-track", type: "line", filter: ["==", ["geometry-type"], "LineString"], paint: { "line-color": "#ffd166", "line-width": 1.2, "line-opacity": 0.9 } },
+            { id: "fp-sel", type: "line", filter: ["all", ["==", ["geometry-type"], "Polygon"], ["==", ["get", "image_id"], selected ?? ""]], paint: { "line-color": "#ffd166", "line-width": 2.5 } },
+            { id: "fp-track", type: "line", filter: ["==", ["geometry-type"], "LineString"], paint: { "line-color": "#9aa4b2", "line-width": 1, "line-opacity": 0.8, "line-dasharray": [3, 2] } },
           ]}
         />
       )}
