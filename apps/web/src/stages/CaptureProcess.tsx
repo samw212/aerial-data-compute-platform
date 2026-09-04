@@ -4,13 +4,14 @@
 import { Shell } from "../app/Shell";
 import { Dock, DockFooter, DockHeader, DockTabs, Empty, Hud, Tag } from "../components/ui";
 import { MapView } from "../map/MapView";
+import { localToLngLat } from "../geo";
 import { STATUS_TONE, useStageContext } from "./useStageContext";
 
 export function CaptureStage() {
   const ctx = useStageContext("Capture");
   const { venue, survey } = ctx;
   const qa = survey?.capture_qa;
-  const center: [number, number] = venue?.centroid_lon != null ? [venue.centroid_lon, venue.centroid_lat!] : [114.17, 22.32];
+  const center: [number, number] = venue ? localToLngLat(venue, 0, 0) : [114.17, 22.32];
   return (
     <Shell crumb={`${venue?.name ?? "…"} · ${survey?.name ?? "…"}`} stages={ctx.links} status={survey && <Tag tone={STATUS_TONE[survey.status] ?? "mute"}>{survey.status.replace("_", " ")}</Tag>}>
       <MapView center={center} zoom={17} />
@@ -40,7 +41,7 @@ export function ProcessStage() {
   const ctx = useStageContext("Process");
   const { venue, survey } = ctx;
   const acc = survey?.accuracy;
-  const center: [number, number] = venue?.centroid_lon != null ? [venue.centroid_lon, venue.centroid_lat!] : [114.17, 22.32];
+  const center: [number, number] = venue ? localToLngLat(venue, 0, 0) : [114.17, 22.32];
   return (
     <Shell crumb={`${venue?.name ?? "…"} · ${survey?.name ?? "…"}`} stages={ctx.links} status={survey && <Tag tone={STATUS_TONE[survey.status] ?? "mute"}>{survey.status.replace("_", " ")}</Tag>}>
       <MapView center={center} zoom={17} />

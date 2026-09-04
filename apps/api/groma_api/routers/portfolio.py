@@ -213,12 +213,17 @@ def create_venue(body: VenueCreate, user: Surveyor, db: DB) -> Venue:
         boundary=storage_polygon(body.boundary) if body.boundary else None,
         survey_interval_months=body.survey_interval_months,
     )
+    db.add(v)
+    db.flush()
     if body.centroid_lon is not None and body.centroid_lat is not None:
         from geoalchemy2.shape import from_shape
         from shapely.geometry import Point
 
         v.centroid_wgs = from_shape(Point(body.centroid_lon, body.centroid_lat), srid=4326)
-    db.add(v)
+    else:
+        from groma_api.seed import set_centroid_from_origin
+
+        set_centroid_from_origin(db, v)
     db.commit()
     return to_venue(v)
 

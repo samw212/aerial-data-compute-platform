@@ -23,6 +23,23 @@ from groma_contracts.site import SiteFixture, SiteOrigin
 from groma_coverage.fixtures import golden_cameras, load_site
 
 PITCH_RING = [(-52.5, -34.0), (52.5, -34.0), (52.5, 34.0), (-52.5, 34.0)]
+# Hong Kong 1980 Grid (EPSG:2326) position of the sports ground, from 22.3823 N 114.2029 E.
+SHA_TIN_E = 838948.0
+SHA_TIN_N = 827010.0
+
+
+def set_centroid_from_origin(db: Session, venue: m.Venue) -> None:
+    """The portfolio marker, from the venue origin via PostGIS: the one place the
+    server transforms between the projected CRS and WGS84."""
+    db.execute(
+        text(
+            "UPDATE venue SET centroid_wgs = "
+            "ST_Transform(ST_SetSRID(ST_MakePoint(:e, :n), :srid), 4326) WHERE id = :id"
+        ),
+        {"e": venue.origin_x, "n": venue.origin_y, "srid": venue.srid, "id": venue.id},
+    )
+    db.flush()
+    db.refresh(venue)
 
 
 def reset_schema(db: Session) -> None:
@@ -49,10 +66,13 @@ def seed(
     db: Session, fixture: Path, admin_email: str, admin_password: str | None = None
 ) -> dict[str, str]:
     site: SiteFixture = load_site(fixture)
+    # The authored fixture's origin is arbitrary; the demo venue sits on the real
+    # Sha Tin Sports Ground so the basemap under the synthetic pitch is the real
+    # one. Coverage is computed in local ENU and does not depend on the origin.
     origin = SiteOrigin(
         srid=site.origin.srid,
-        x=site.origin.x,
-        y=site.origin.y,
+        x=SHA_TIN_E,
+        y=SHA_TIN_N,
         z=site.origin.z,
         height_datum=site.origin.height_datum,
     )
@@ -71,15 +91,14 @@ def seed(
     )
     db.add(admin)
 
-    # Sha Tin Sports Ground is the WGS84 centroid of Hong Kong Grid (833000, 817000).
     venue = m.Venue(
         org_id=org.id,
         name="Sha Tin Sports Ground",
         reference="SAMPLE-001",
         srid=site.srid,
-        origin_x=site.origin.x,
-        origin_y=site.origin.y,
-        origin_z=site.origin.z,
+        origin_x=origin.x,
+        origin_y=origin.y,
+        origin_z=origin.z,
         height_datum=site.origin.height_datum.value,
         boundary=polygon_to_storage(
             [
@@ -92,12 +111,9 @@ def seed(
         ),
         survey_interval_months=24,
     )
-    from geoalchemy2.shape import from_shape
-    from shapely.geometry import Point
-
-    venue.centroid_wgs = from_shape(Point(114.2029, 22.3823), srid=4326)
     db.add(venue)
     db.flush()
+    set_centroid_from_origin(db, venue)
 
     pitch = m.Facility(
         venue_id=venue.id,

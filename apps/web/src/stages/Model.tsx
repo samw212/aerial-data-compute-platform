@@ -1,11 +1,12 @@
 /* Model: Map + 3D + Review + Measure in one viewport. docs/FRONTEND-DESIGN.md 2.4. */
 
 import { useCallback, useEffect, useMemo, useState } from "react";
+import { Link } from "react-router-dom";
 import { usePatchStructure, useStructures } from "../api/queries";
 import type { Structure } from "../api/contracts";
 import { Shell } from "../app/Shell";
 import { Bar, Chips, Dock, DockFooter, DockHeader, DockTabs, Empty, Hud, Kv, Strip, Tag, ToolRail, ViewControl } from "../components/ui";
-import { lngLatToLocal, storageRingToLocal } from "../geo";
+import { lngLatToLocal, localToLngLat, ringToLngLat, storageRingToLocal } from "../geo";
 import { GeoLayer, MapView } from "../map/MapView";
 import { STATE_COLOR, ringsFC, structuresFC } from "../map/features";
 import { Scene3D } from "../scene/Scene3D";
@@ -69,7 +70,8 @@ export function ModelStage() {
     const xs = ring.map((p) => p[0]), zs = ring.map((p) => p[1]);
     return { x_min: Math.min(...xs) - 15, x_max: Math.max(...xs) + 15, z_min: Math.min(...zs) - 10, z_max: Math.max(...zs) + 10 };
   }, [facilityRings]);
-  const center: [number, number] = venue?.centroid_lon != null ? [venue.centroid_lon, venue.centroid_lat!] : [114.17, 22.32];
+  const center: [number, number] = venue ? localToLngLat(venue, 0, 0) : [114.17, 22.32];
+  const bounds = useMemo(() => (venue && facilityRings[0] ? ringToLngLat(venue, facilityRings[0]) : venue ? ringToLngLat(venue, [[-70, -45], [70, -45], [70, 45], [-70, 45]]) : null), [venue, facilityRings]);
   const counts = useMemo(() => {
     const all = structures.data ?? [];
     return { total: all.length, pending: all.filter((s) => s.state === "pending").length };
@@ -80,7 +82,7 @@ export function ModelStage() {
       {ui.view === "3d" ? (
         <Scene3D extent={extent} structures={structures.data ?? []} cameras={[]} selected={ui.selection} onSelect={ui.select} />
       ) : (
-        <MapView center={center} zoom={17.5} onMouseMove={setCursor} onClick={(_, e) => {
+        <MapView center={center} zoom={17.5} bounds={bounds} onMouseMove={setCursor} onClick={(_, e) => {
           const f = e.target.queryRenderedFeatures(e.point, { layers: ["str-fill"] })[0];
           ui.select(f ? String(f.properties.id) : null);
         }}>
@@ -188,7 +190,7 @@ export function ModelStage() {
         )}
         <DockFooter>
           <span className="m" style={{ fontSize: 11, color: "var(--color-ink-3)" }}>{counts.pending} pending · occluders read state = accepted</span>
-          {ctx.links.find((l) => l.stage === "Plan")?.to && <a className="btn acc" style={{ marginLeft: "auto" }} href={ctx.links.find((l) => l.stage === "Plan")!.to}>Plan →</a>}
+          {ctx.links.find((l) => l.stage === "Plan")?.to && <Link className="btn acc" style={{ marginLeft: "auto" }} to={ctx.links.find((l) => l.stage === "Plan")!.to!}>Plan →</Link>}
         </DockFooter>
       </Dock>
     </Shell>

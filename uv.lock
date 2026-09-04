@@ -921,6 +921,7 @@ dependencies = [
 dev = [
     { name = "groma-api" },
     { name = "groma-cli" },
+    { name = "groma-worker" },
     { name = "httpx2" },
     { name = "hypothesis" },
     { name = "mypy" },
@@ -944,6 +945,7 @@ requires-dist = [
 dev = [
     { name = "groma-api", editable = "apps/api" },
     { name = "groma-cli", editable = "apps/cli" },
+    { name = "groma-worker", editable = "apps/worker" },
     { name = "httpx2" },
     { name = "hypothesis", specifier = ">=6.100" },
     { name = "mypy", specifier = ">=1.11" },
@@ -1188,7 +1190,7 @@ name = "groma-worker"
 version = "0.1.0"
 source = { editable = "apps/worker" }
 dependencies = [
-    { name = "arq" },
+    { name = "groma-api" },
     { name = "groma-contracts" },
     { name = "groma-coverage" },
     { name = "groma-geo" },
@@ -1197,7 +1199,7 @@ dependencies = [
 
 [package.metadata]
 requires-dist = [
-    { name = "arq", specifier = ">=0.26" },
+    { name = "groma-api", editable = "apps/api" },
     { name = "groma-contracts", editable = "packages/contracts" },
     { name = "groma-coverage", editable = "packages/coverage" },
     { name = "groma-geo", editable = "packages/geo" },

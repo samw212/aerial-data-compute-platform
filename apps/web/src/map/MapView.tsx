@@ -11,6 +11,8 @@ const ATTR = '© <a href="https://portal.csdi.gov.hk/">Lands Department, HKSAR</
 
 export const baseStyle: StyleSpecification = {
   version: 8,
+  // Glyphs for symbol layers (labels on cameras, structures, venues). Open, keyless.
+  glyphs: "https://fonts.openmaptiles.org/{fontstack}/{range}.pbf",
   sources: {
     basemap: { type: "raster", tiles: [`${HK}/basemap/wgs84/{z}/{x}/{y}.png`], tileSize: 256, maxzoom: 20, attribution: ATTR },
     imagery: { type: "raster", tiles: [`${HK}/imagery/wgs84/{z}/{x}/{y}.png`], tileSize: 256, maxzoom: 19, attribution: ATTR },
@@ -18,16 +20,21 @@ export const baseStyle: StyleSpecification = {
   },
   layers: [
     { id: "bg", type: "background", paint: { "background-color": "#0e1116" } },
-    { id: "basemap", type: "raster", source: "basemap", paint: { "raster-opacity": 0.55, "raster-saturation": -0.6, "raster-brightness-max": 0.55, "raster-contrast": 0.1 } },
+    { id: "basemap", type: "raster", source: "basemap", paint: { "raster-opacity": 0.85, "raster-saturation": -0.5, "raster-brightness-max": 0.7, "raster-brightness-min": 0.05, "raster-contrast": 0.05 } },
     { id: "imagery", type: "raster", source: "imagery", layout: { visibility: "none" }, paint: { "raster-opacity": 0.9, "raster-brightness-max": 0.85 } },
     { id: "labels", type: "raster", source: "labels", paint: { "raster-opacity": 0.7 } },
   ],
 };
 
+/** False once map.remove() has run: layer cleanups must not touch a dead map. */
+function alive(map: MLMap | null): map is MLMap {
+  return !!map && !(map as unknown as { _removed?: boolean })._removed && !!(map as unknown as { style?: unknown }).style;
+}
+
 const MapCtx = createContext<MLMap | null>(null);
 export const useMap = () => useContext(MapCtx);
 
-export function MapView({ center, zoom = 17, children, onClick, onMouseMove }: { center: [number, number]; zoom?: number; children?: ReactNode; onClick?: (lngLat: [number, number], e: maplibregl.MapMouseEvent) => void; onMouseMove?: (lngLat: [number, number]) => void }) {
+export function MapView({ center, zoom = 17, bounds, children, onClick, onMouseMove }: { center: [number, number]; zoom?: number; bounds?: [number, number][] | null; children?: ReactNode; onClick?: (lngLat: [number, number], e: maplibregl.MapMouseEvent) => void; onMouseMove?: (lngLat: [number, number]) => void }) {
   const el = useRef<HTMLDivElement>(null);
   const [map, setMap] = useState<MLMap | null>(null);
   const layers = useUi((s) => s.layers);
@@ -36,10 +43,20 @@ export function MapView({ center, zoom = 17, children, onClick, onMouseMove }: {
     if (!el.current) return;
     const m = new maplibregl.Map({ container: el.current, style: baseStyle, center, zoom, attributionControl: { compact: true }, maxPitch: 0, dragRotate: false, pitchWithRotate: false });
     m.touchZoomRotate.disableRotation();
+    (window as unknown as { __adcpMap?: MLMap }).__adcpMap = m; // for e2e assertions
     m.on("load", () => setMap(m));
     return () => { setMap(null); m.remove(); };
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
+
+  // Fit once to the facility (or whatever ring the stage hands in), padded for the dock.
+  const fitted = useRef(false);
+  useEffect(() => {
+    if (!map || !bounds || !bounds.length || fitted.current) return;
+    const lngs = bounds.map((p) => p[0]), lats = bounds.map((p) => p[1]);
+    map.fitBounds([[Math.min(...lngs), Math.min(...lats)], [Math.max(...lngs), Math.max(...lats)]], { padding: { top: 90, bottom: 60, left: 70, right: 430 }, duration: 0 });
+    fitted.current = true;
+  }, [map, bounds]);
 
   useEffect(() => {
     if (!map) return;
@@ -82,11 +99,11 @@ export function GeoLayer({ id, data, layers, visible = true, before }: { id: str
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [map, id, data]);
   useEffect(() => {
-    if (!map) return;
+    if (!alive(map)) return;
     for (const l of layers) if (map.getLayer(l.id)) map.setLayoutProperty(l.id, "visibility", visible ? "visible" : "none");
   }, [map, layers, visible]);
   useEffect(() => () => {
-    if (!map) return;
+    if (!alive(map)) return;
     for (const l of layers) if (map.getLayer(l.id)) map.removeLayer(l.id);
     if (map.getSource(id)) map.removeSource(id);
     // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -108,12 +125,12 @@ export function ImageLayer({ id, url, coordinates, visible = true, opacity = 1, 
     }
   }, [map, id, url, coordinates, opacity, before]);
   useEffect(() => {
-    if (!map || !map.getLayer(id)) return;
+    if (!alive(map) || !map.getLayer(id)) return;
     map.setLayoutProperty(id, "visibility", visible ? "visible" : "none");
     map.setPaintProperty(id, "raster-opacity", opacity);
   }, [map, id, visible, opacity]);
   useEffect(() => () => {
-    if (!map) return;
+    if (!alive(map)) return;
     if (map.getLayer(id)) map.removeLayer(id);
     if (map.getSource(id)) map.removeSource(id);
     // eslint-disable-next-line react-hooks/exhaustive-deps

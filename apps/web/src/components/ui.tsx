@@ -57,7 +57,7 @@ export function DockTabs({ tabs, active, onPick }: { tabs: string[]; active: str
   return (
     <div style={{ display: "flex", borderBottom: "1px solid var(--color-line)" }}>
       {tabs.map((t) => (
-        <button key={t} onClick={() => onPick(t)} style={{ padding: "9px 12px", fontSize: 12, fontWeight: 600, color: t === active ? "var(--color-ink)" : "var(--color-ink-3)", borderBottom: `2px solid ${t === active ? "var(--color-acc)" : "transparent"}`, marginBottom: -1, background: "none", border: "none", borderBottomWidth: 2, borderBottomStyle: "solid", cursor: "pointer", fontFamily: "inherit" }}>{t}</button>
+        <button key={t} onClick={() => onPick(t)} style={{ padding: "9px 12px", fontSize: 12, fontWeight: 600, color: t === active ? "var(--color-ink)" : "var(--color-ink-3)", borderWidth: "0 0 2px 0", borderStyle: "solid", borderColor: t === active ? "var(--color-acc)" : "transparent", marginBottom: -1, background: "none", cursor: "pointer", fontFamily: "inherit" }}>{t}</button>
       ))}
     </div>
   );

@@ -3,12 +3,13 @@
 
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import type maplibregl from "maplibre-gl";
+import { Link } from "react-router-dom";
 import { api } from "../api/client";
 import type { CameraSpec, CoverageRun } from "../api/contracts";
 import { usePatchCamera, useRunCoverage, useRuns, useScene, useStructures } from "../api/queries";
 import { Shell } from "../app/Shell";
 import { Bar, Chips, Dock, DockFooter, DockHeader, DockTabs, Empty, Hud, Slider, Tag, ToolRail, ViewControl } from "../components/ui";
-import { lngLatToLocal } from "../geo";
+import { lngLatToLocal, localToLngLat, ringToLngLat } from "../geo";
 import { heatmapCanvas } from "../heat";
 import { DORI, TIERS_HARDEST_FIRST, blindPct, redundantPct, tierPct, type Tier } from "../kernel/stats";
 import { rleToMask, useKernel } from "../kernel/useKernel";
@@ -80,9 +81,10 @@ export function PlanStage() {
   const selectedCam = planner.cameras.find((c) => c.id === ui.selection) ?? null;
   const fc = useMemo(() => (venue ? camerasFC(venue, planner.cameras, ui.selection) : null), [venue, planner.cameras, ui.selection]);
   const sfc = useMemo(() => (venue ? structuresFC(venue, (structures.data ?? []).filter((s) => s.state === "accepted" || (planner.includeSeasonal && s.state === "seasonal")), null) : null), [venue, structures.data, planner.includeSeasonal]);
-  const center: [number, number] = venue?.centroid_lon != null ? [venue.centroid_lon, venue.centroid_lat!] : [114.17, 22.32];
+  const center: [number, number] = venue ? localToLngLat(venue, 0, 0) : [114.17, 22.32];
   const stats = preview?.stats;
-  const extent = scene.data?.grid ?? { x_min: -70, x_max: 70, z_min: -45, z_max: 45 };
+  const extent = useMemo(() => scene.data?.grid ?? { x_min: -70, x_max: 70, z_min: -45, z_max: 45 }, [scene.data]);
+  const bounds = useMemo(() => (venue && scene.data ? ringToLngLat(venue, [[extent.x_min, extent.z_min], [extent.x_max, extent.z_min], [extent.x_max, extent.z_max], [extent.x_min, extent.z_max]]) : null), [venue, scene.data, extent]);
 
   const saveCamera = (c: CameraSpec) => {
     if (!scenarioId) return;
@@ -101,7 +103,7 @@ export function PlanStage() {
       {ui.view === "3d" ? (
         <Scene3D extent={extent} structures={(structures.data ?? []).filter((s) => s.state === "accepted")} cameras={planner.cameras} selected={ui.selection} onSelect={ui.select} heatCanvas={ui.layers.coverage ? heat : null} heatExtent={preview?.grid ?? null} />
       ) : (
-        <MapView center={center} zoom={17.5} onMouseMove={setCursor} onClick={(ll, e) => {
+        <MapView center={center} zoom={17.5} bounds={bounds} onMouseMove={setCursor} onClick={(ll, e) => {
           const f = e.target.queryRenderedFeatures(e.point, { layers: ["cam-pts"] })[0];
           if (f) { ui.select(String(f.properties.id)); return; }
           if (ui.tool === "target" && selectedCam && venue) { const [x, z] = lngLatToLocal(venue, ll[0], ll[1]); aimAt(selectedCam, x, z); ui.setTool("select"); return; }
@@ -211,7 +213,7 @@ export function PlanStage() {
         <DockFooter>
           <button className="btn acc" onClick={runOnServer} disabled={runCoverage.isPending}>{runCoverage.isPending ? "Running…" : "Run on server"}</button>
           <button className="btn" onClick={saveAll} disabled={!planner.dirty.size}>Save {planner.dirty.size ? planner.dirty.size : ""}</button>
-          {ctx.links.find((l) => l.stage === "Report")?.to && <a className="btn" style={{ marginLeft: "auto" }} href={ctx.links.find((l) => l.stage === "Report")!.to}>Report →</a>}
+          {ctx.links.find((l) => l.stage === "Report")?.to && <Link className="btn" style={{ marginLeft: "auto" }} to={ctx.links.find((l) => l.stage === "Report")!.to!}>Report →</Link>}
         </DockFooter>
       </Dock>
     </Shell>

@@ -5,7 +5,7 @@ import { Link, useParams } from "react-router-dom";
 import { useFacilities, useScenarios, useSurveys, useVenue } from "../api/queries";
 import { Shell } from "../app/Shell";
 import { Dock, DockHeader, DockTabs, Empty, Tag } from "../components/ui";
-import { storageRingToLngLat } from "../geo";
+import { localToLngLat, storageRingToLngLat } from "../geo";
 import { GeoLayer, MapView } from "../map/MapView";
 import { STATUS_TONE } from "./useStageContext";
 
@@ -21,11 +21,12 @@ export function VenuePage() {
     type: "FeatureCollection",
     features: v ? (facilities.data ?? []).map((f) => ({ type: "Feature", id: f.id, properties: { name: f.name }, geometry: { type: "Polygon", coordinates: [storageRingToLngLat(v.srid, f.boundary)] } })) : [],
   }), [v, facilities.data]);
-  const center: [number, number] = v?.centroid_lon != null ? [v.centroid_lon, v.centroid_lat!] : [114.17, 22.32];
+  const center: [number, number] = v ? localToLngLat(v, 0, 0) : [114.17, 22.32];
+  const bounds = useMemo(() => (v && facilities.data?.[0] ? storageRingToLngLat(v.srid, facilities.data[0].boundary) : null), [v, facilities.data]);
   const latest = surveys.data?.find((s) => s.status === "complete");
   return (
     <Shell crumb={v?.name ?? "…"}>
-      <MapView center={center} zoom={17}>
+      <MapView center={center} zoom={17} bounds={bounds}>
         <GeoLayer id="facilities" data={fc} layers={[
           { id: "fac-fill", type: "fill", paint: { "fill-color": "#5ee7ff", "fill-opacity": 0.08 } },
           { id: "fac-line", type: "line", paint: { "line-color": "#5ee7ff", "line-width": 1.5, "line-dasharray": [4, 3] } },
