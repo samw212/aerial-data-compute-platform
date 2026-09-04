@@ -7,8 +7,18 @@ or below it.
 
 from datetime import datetime
 from enum import StrEnum
+from typing import Annotated
 
-from pydantic import BaseModel, ConfigDict, EmailStr, Field
+from pydantic import BaseModel, ConfigDict, Field, StringConstraints
+
+Email = Annotated[
+    str,
+    StringConstraints(
+        strip_whitespace=True, to_lower=True, pattern=r"^[^@\s]+@[^@\s]+\.[^@\s]+$", max_length=254
+    ),
+]
+"""Deliberately looser than an RFC validator: an internal domain like adcp.local is a
+normal choice on a private deployment, and a strict validator refuses it."""
 
 
 class Role(StrEnum):
@@ -29,7 +39,7 @@ _RANK = {Role.VIEWER: 0, Role.SURVEYOR: 1, Role.ADMIN: 2}
 
 class User(BaseModel):
     id: str
-    email: EmailStr
+    email: Email
     name: str
     role: Role = Role.VIEWER
     org_id: str
@@ -39,7 +49,7 @@ class User(BaseModel):
 class LoginRequest(BaseModel):
     model_config = ConfigDict(frozen=True)
 
-    email: EmailStr
+    email: Email
     password: str = Field(min_length=1)
 
 
@@ -49,7 +59,7 @@ class SessionInfo(BaseModel):
 
 
 class UserCreate(BaseModel):
-    email: EmailStr
+    email: Email
     name: str
     role: Role = Role.VIEWER
     password: str = Field(min_length=10)

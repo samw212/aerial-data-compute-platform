@@ -1,12 +1,13 @@
 [project]
 name = "groma-cli"
 version = "0.1.0"
-description = "The groma command line: seed, coverage, bench."
+description = "The groma command line: coverage, migrate, seed, users."
 requires-python = ">=3.12"
 dependencies = [
     "groma-contracts",
     "groma-geo",
     "groma-coverage",
+    "groma-api",
     "typer>=0.12",
 ]
 

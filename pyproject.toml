@@ -54,6 +54,7 @@ testpaths = ["tests"]
 pythonpath = ["."]
 addopts = "-q --strict-markers --strict-config"
 markers = [
+    "integration: needs GROMA_TEST_DATABASE_URL (a real PostGIS)",
     "slow: excluded from the unit suite; must stay under 5 seconds (build-spec 18)",
     "bench: performance benchmarks, run by `make kernel-bench`",
 ]
@@ -121,10 +122,14 @@ mypy_path = [
     "packages/tiles",
     "packages/segment",
 ]
-exclude = ["^\\.venv/", "^migrations/"]
+exclude = ["^\\.venv/", "^migrations/", "^apps/web/"]
 
 [[tool.mypy.overrides]]
-module = ["tests.*", "scripts.*"]
+module = ["shapely.*", "geoalchemy2.*", "arq.*"]
+ignore_missing_imports = true
+
+[[tool.mypy.overrides]]
+module = ["tests.*", "scripts.*", "migrations.*"]
 strict = false
 disallow_untyped_defs = false
 

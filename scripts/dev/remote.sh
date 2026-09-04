@@ -14,6 +14,10 @@ set -euo pipefail
 HOST="${ADCP_SSH_HOST:-adcp}"
 REMOTE_APP="${ADCP_REMOTE_APP:-/root/autodl-tmp/groma/app}"
 HERE="$(cd "$(dirname "$0")/../.." && pwd)"
+# uv.lock pins wheel URLs on files.pythonhosted.org, which the instance reaches
+# slowly. The mirror serves byte-identical files under the same path, so the
+# hashes in the lock still verify. Rewritten on the instance only.
+PYPI_MIRROR="${ADCP_PYPI_MIRROR:-https://mirrors.aliyun.com/pypi/packages/}"
 
 sync() {
   rsync -az --delete \
@@ -22,11 +26,13 @@ sync() {
     --exclude '.ruff_cache/' --exclude 'apps/web/dist/' --exclude 'AUTODL.md' \
     --exclude 'SPEC.md' --exclude '.DS_Store' \
     "$HERE/" "$HOST:$REMOTE_APP/"
+  # shellcheck disable=SC2029
+  ssh -o BatchMode=yes "$HOST" "sed -i 's#https://files.pythonhosted.org/packages/#$PYPI_MIRROR#g' '$REMOTE_APP/uv.lock'"
 }
 
 run() {
   # shellcheck disable=SC2029
-  ssh -o BatchMode=yes "$HOST" "cd '$REMOTE_APP' && export PATH=\"\$HOME/.local/bin:\$HOME/.pixi/bin:\$PATH\" && $*"
+  ssh -o BatchMode=yes "$HOST" "cd '$REMOTE_APP' && unset http_proxy https_proxy && export PATH=\"\$HOME/.local/bin:\$HOME/.pixi/bin:\$PATH\" UV_INDEX_URL=https://mirrors.aliyun.com/pypi/simple && $*"
 }
 
 case "${1:-}" in
