@@ -634,3 +634,68 @@ def test_unscorable_imagery_raises_rather_than_reporting_100_percent_blur():
     # The gate itself still treats a genuinely dark frame as blurred, which is right.
     dark = [AssessedImage(filename="d.jpg", sharpness=0.0, clipped_fraction=0.0)]
     assert apply_gates(dark, sharpness_floor=8.0)[0].state.value == "rejected_blur"
+
+
+# --- C15 ground footprints ---------------------------------------------------
+
+
+def test_footprint_half_extents_are_the_closed_form():
+    """C15. Half of 2h*tan(fov/2), computed here from the sensor."""
+    from groma_capture.footprint import half_extents_m
+
+    across, along = half_extents_m(ALTITUDE_M, 13.2, 8.8, 8.8)
+    assert across == pytest.approx(ALTITUDE_M * math.tan(math.atan(13.2 / (2 * 8.8))))
+    assert along == pytest.approx(ALTITUDE_M * math.tan(math.atan(8.8 / (2 * 8.8))))
+    assert (across, along) == pytest.approx((ACROSS_M / 2, ALONG_M / 2))
+
+
+def test_footprint_at_yaw_zero_is_axis_aligned():
+    """C15. Facing north, the corners are simply the half extents."""
+    from groma_capture.footprint import footprint_corners
+
+    corners = footprint_corners(
+        0.0, 0.0, altitude_agl_m=ALTITUDE_M, yaw_deg=0.0,
+        sensor_w_mm=13.2, sensor_h_mm=8.8, focal_mm=8.8,
+    )
+    rounded = sorted((round(x, 6), round(y, 6)) for x, y in corners)
+    assert rounded == [(-75.0, -50.0), (-75.0, 50.0), (75.0, -50.0), (75.0, 50.0)]
+
+
+def test_footprint_rotates_with_yaw():
+    """C15. Turning the aircraft east swaps which ground axis the long edge lies on.
+
+    The long edge is across track, 150 m. Facing north it spans x; facing east it
+    spans y. Getting this backwards puts every footprint at right angles to the
+    flight and looks plausible on a map, which is why it is asserted rather than
+    eyeballed.
+    """
+    from groma_capture.footprint import footprint_corners
+
+    east = footprint_corners(
+        0.0, 0.0, altitude_agl_m=ALTITUDE_M, yaw_deg=90.0,
+        sensor_w_mm=13.2, sensor_h_mm=8.8, focal_mm=8.8,
+    )
+    xs = [c[0] for c in east]
+    ys = [c[1] for c in east]
+    assert max(xs) - min(xs) == pytest.approx(ALONG_M)
+    assert max(ys) - min(ys) == pytest.approx(ACROSS_M)
+
+
+def test_footprint_is_empty_without_a_height():
+    """C15. No height above ground means no footprint, not a degenerate one."""
+    from groma_capture.footprint import footprint_corners
+
+    assert footprint_corners(
+        0.0, 0.0, altitude_agl_m=0.0, yaw_deg=0.0,
+        sensor_w_mm=13.2, sensor_h_mm=8.8, focal_mm=8.8,
+    ) == []
+
+
+def test_ingest_result_exposes_height_above_take_off_per_frame():
+    """C15. SourceImage has no column for it, and the footprint cannot be drawn without it."""
+    records = _flight_records(lines=1, per_line=3)
+    scores = {r.filename: (100.0, 0.0) for r in records}
+    result = ingest_records(records, scores, survey_id="s1", georef="rtk")
+    agl = result.agl_by_filename
+    assert len(agl) == 3
+    assert set(agl.values()) == {ALTITUDE_M}

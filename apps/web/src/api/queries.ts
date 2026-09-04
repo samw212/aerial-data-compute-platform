@@ -97,3 +97,42 @@ export const useRunCoverage = () => {
 };
 
 export type { Tent };
+
+/* --- Source imagery (M6 capture ingest) ---------------------------------- */
+
+export interface SourceImageRow {
+  id: string;
+  filename: string;
+  width: number;
+  height: number;
+  state: string;
+  captured_at: string | null;
+  sharpness: number | null;
+  clipped_fraction: number | null;
+  gimbal_pitch_deg: number | null;
+  gimbal_yaw_deg: number | null;
+  rtk_fixed: boolean;
+  lon: number | null;
+  lat: number | null;
+  altitude_m: number | null;
+  thumb_url: string;
+}
+export interface ImagePage {
+  total: number;
+  accepted: number;
+  items: SourceImageRow[];
+}
+
+export const useSurveyImages = (surveyId?: string, limit = 400) =>
+  useQuery({
+    queryKey: ["/api/surveys", surveyId, "images", limit],
+    queryFn: () => api.get<ImagePage>(`/api/surveys/${surveyId}/images?limit=${limit}`),
+    enabled: !!surveyId,
+  });
+
+export const useImageFootprints = (surveyId?: string) =>
+  useQuery({
+    queryKey: ["/api/surveys", surveyId, "images", "footprints"],
+    queryFn: () => api.get<GeoJSON.FeatureCollection>(`/api/surveys/${surveyId}/images/footprints`),
+    enabled: !!surveyId,
+  });

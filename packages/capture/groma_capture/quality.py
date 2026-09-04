@@ -121,19 +121,19 @@ def score_file(path: str, *, width: int = DOWNSCALE_WIDTH) -> tuple[float, float
     surfaces as a deployment fault.
     """
     try:
-        from PIL import Image  # type: ignore[import-not-found]  # lazy: pillow is an m6 extra
+        from PIL import Image  # pillow is an m6 extra, imported lazily
     except ImportError as exc:  # pragma: no cover - exercised by the deployment, not the suite
         raise ScoringUnavailableError(
             "Pillow is not installed, so image quality cannot be scored. Install the "
             "capture extra: uv sync --extra m6"
         ) from exc
 
-    with Image.open(path) as im:
-        im = im.convert("RGB")
-        clipped = clipped_fraction(np.asarray(im))
-        if im.width > width:
-            im = im.resize((width, max(1, round(im.height * width / im.width))))
-        grey = to_greyscale(np.asarray(im))
+    with Image.open(path) as opened:
+        rgb = opened.convert("RGB")
+        clipped = clipped_fraction(np.asarray(rgb))
+        if rgb.width > width:
+            rgb = rgb.resize((width, max(1, round(rgb.height * width / rgb.width))))
+        grey = to_greyscale(np.asarray(rgb))
     return laplacian_variance(grey), clipped
 
 

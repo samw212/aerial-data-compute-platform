@@ -19,7 +19,7 @@ from __future__ import annotations
 import hashlib
 import math
 from collections.abc import Callable, Iterable
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 from pathlib import Path
 
 from groma_capture.classify import classify
@@ -65,6 +65,22 @@ class IngestResult:
     sensor: SensorSpec | None
     sensor_estimated: bool
     estimated_gsd_m: float | None
+    records: list[ExifRecord] = field(default_factory=list)
+    """The parsed metadata, kept so callers can reach what SourceImage does not model.
+
+    Height above the take-off point is the case that matters. It is what a ground
+    footprint needs and what the aircraft actually records, but it is not a property
+    of the image in the contract sense, so it has no column on SourceImage.
+    """
+
+    @property
+    def agl_by_filename(self) -> dict[str, float]:
+        """Height above the take-off point, per frame, where the aircraft recorded one."""
+        return {
+            r.filename: r.relative_altitude_m
+            for r in self.records
+            if r.relative_altitude_m is not None
+        }
 
 
 def _shots(records: list[ExifRecord], projector: Projector | None) -> list[Shot]:
@@ -132,7 +148,7 @@ def ingest_records(
     """
     if not records:
         empty = build_qa([], classify([]), georef=georef, has_scale_bar=has_scale_bar)
-        return IngestResult([], empty, None, False, None)
+        return IngestResult([], empty, None, False, None, [])
 
     first = records[0]
     sensor, estimated = resolve_sensor(
@@ -210,7 +226,7 @@ def ingest_records(
                 state=a.state,
             )
         )
-    return IngestResult(images, qa, sensor, estimated, gsd)
+    return IngestResult(images, qa, sensor, estimated, gsd, list(records))
 
 
 def ingest_directory(

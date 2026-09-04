@@ -224,3 +224,131 @@ def users_list() -> None:
 
 if __name__ == "__main__":
     app()
+
+
+capture_app = typer.Typer(help="Capture ingest: read a flight into a survey.")
+app.add_typer(capture_app, name="capture")
+
+
+@capture_app.command("ingest")
+def capture_ingest(
+    directory: str,
+    survey: Annotated[str, typer.Option(help="Survey id to ingest into.")],
+    reset: Annotated[
+        bool, typer.Option(help="Delete this survey's existing images first.")
+    ] = False,
+    thumbnails: Annotated[bool, typer.Option(help="Write gallery thumbnails.")] = True,
+) -> None:
+    """Read a directory of drone images into a survey: rows, thumbnails and the QA gate.
+
+    Point this at the directory that holds the frames. Several published datasets keep
+    a repository preview picture beside the flight, and that picture has no EXIF at
+    all, so ingesting the parent directory silently dilutes the QA report.
+    """
+    import uuid as _uuid
+    from pathlib import Path
+
+    from sqlalchemy import delete, select
+
+    from groma_api.db import SessionLocal
+    from groma_api.db import models as m
+    from groma_api.settings import get_settings
+    from groma_capture.ingest import ingest_directory
+    from groma_capture.thumbnails import write_thumbnail
+
+    cfg = get_settings()
+    survey_uuid = _uuid.UUID(survey)
+    db = SessionLocal()()
+    try:
+        row = db.get(m.Survey, survey_uuid)
+        if row is None:
+            raise typer.BadParameter(f"no survey {survey}")
+        if row.immutable:
+            raise typer.BadParameter(
+                "this survey is immutable; re-flying a site creates a new survey"
+            )
+
+        typer.echo(f"reading {directory} ...")
+        result = ingest_directory(
+            directory, survey_id=survey, georef=row.georef, checksums=True
+        )
+        typer.echo(f"  {result.qa.image_count} images, {result.qa.accepted_count} accepted")
+
+        if reset:
+            db.execute(delete(m.SourceImage).where(m.SourceImage.survey_id == survey_uuid))
+
+        existing = {
+            r.filename
+            for r in db.scalars(
+                select(m.SourceImage).where(m.SourceImage.survey_id == survey_uuid)
+            )
+        }
+        # Height above the take-off point travels in `pose`: the ground footprint
+        # needs it and SourceImage has no column for it.
+        agl = result.agl_by_filename
+        thumb_root = Path(cfg.artefact_root) / "thumbs" / survey
+        written = skipped = 0
+        for img in result.images:
+            if img.filename in existing:
+                skipped += 1
+                continue
+            rec = m.SourceImage(
+                survey_id=survey_uuid,
+                filename=img.filename,
+                uri=img.uri,
+                sha256=img.sha256,
+                width=img.width,
+                height=img.height,
+                focal_mm=img.focal_mm,
+                sensor_w_mm=img.sensor.sensor_w_mm if img.sensor else None,
+                sensor_h_mm=img.sensor.sensor_h_mm if img.sensor else None,
+                captured_at=img.captured_at,
+                gps_accuracy_m=img.gps_accuracy_m,
+                rtk_fixed=img.rtk_fixed,
+                gimbal_pitch_deg=img.gimbal_pitch_deg,
+                gimbal_yaw_deg=img.gimbal_yaw_deg,
+                sharpness=img.sharpness,
+                clipped_fraction=img.clipped_fraction,
+                state=img.state.value,
+                pose=(
+                    {
+                        "lon": img.gps.x,
+                        "lat": img.gps.y,
+                        "alt_m": img.gps.z,
+                        "agl_m": agl.get(img.filename),
+                    }
+                    if img.gps
+                    else None
+                ),
+            )
+            db.add(rec)
+            db.flush()
+            if thumbnails:
+                try:
+                    write_thumbnail(img.uri, thumb_root / f"{rec.id}.jpg")
+                except OSError as exc:
+                    typer.echo(f"  thumbnail failed for {img.filename}: {exc}")
+            written += 1
+
+        row.capture_qa = result.qa.model_dump(mode="json")
+        db.commit()
+    finally:
+        db.close()
+
+    typer.echo(f"  wrote {written} images, skipped {skipped} already present")
+    if result.estimated_gsd_m:
+        typer.echo(f"  GSD {result.estimated_gsd_m * 100:.2f} cm/px")
+    if result.qa.estimated_front_overlap is not None:
+        typer.echo(
+            f"  overlap front {result.qa.estimated_front_overlap:.0%}"
+            + (
+                f", side {result.qa.estimated_side_overlap:.0%}"
+                if result.qa.estimated_side_overlap is not None
+                else ""
+            )
+        )
+    for w in result.qa.warnings:
+        typer.echo(f"  ! {w}")
+    for b in result.qa.blocking:
+        typer.echo(f"  x {b}")
+    typer.echo("done" if not result.qa.blocking else "done; reconstruction is blocked")

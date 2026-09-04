@@ -7,6 +7,8 @@ dependencies = [
     "groma-contracts",
     "groma-geo",
     "groma-coverage",
+    # The images router draws ground footprints and classifies nadir frames.
+    "groma-capture",
     "fastapi>=0.111",
     "uvicorn[standard]>=0.30",
     "sqlalchemy>=2.0",

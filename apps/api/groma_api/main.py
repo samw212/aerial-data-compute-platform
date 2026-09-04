@@ -23,6 +23,7 @@ from groma_api.db import SessionLocal
 from groma_api.routers import (
     auth,
     coverage,
+    images,
     jobs,
     measurements,
     portfolio,
@@ -54,7 +55,7 @@ app = FastAPI(
     openapi_url="/api/openapi.json",
 )
 
-for r in (auth, portfolio, surveys, structures, scenarios, coverage, measurements, jobs):
+for r in (auth, portfolio, surveys, images, structures, scenarios, coverage, measurements, jobs):
     app.include_router(r.router)
 
 
