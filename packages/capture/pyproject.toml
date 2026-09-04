@@ -9,7 +9,10 @@ requires-python = ">=3.12"
 dependencies = ["groma-contracts", "groma-geo", "numpy>=1.26"]
 
 [project.optional-dependencies]
-m6 = ["pillow>=10.0", "opencv-python-headless>=4.9", "pyyaml>=6.0"]
+# Pillow decodes frames and pyyaml reads the sensor table. The Laplacian is
+# implemented in NumPy rather than pulled from OpenCV, so that the same numbers
+# come out in the worker, the CLI and CI without a 60 MB wheel.
+m6 = ["pillow>=10.0", "pyyaml>=6.0"]
 
 [build-system]
 requires = ["hatchling"]

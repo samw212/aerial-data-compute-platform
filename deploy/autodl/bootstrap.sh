@@ -106,7 +106,7 @@ export UV_PYTHON_INSTALL_MIRROR="${UV_PYTHON_INSTALL_MIRROR:-https://ghfast.top/
 uv python install 3.12 --quiet >/dev/null 2>&1 || true
 # The lock pins files.pythonhosted.org; the mirror serves byte-identical files.
 sed -i "s#https://files.pythonhosted.org/packages/#$PYPI_MIRROR/packages/#g" uv.lock
-UV_INDEX_URL="$PYPI_MIRROR/simple" uv sync --dev --frozen --quiet
+UV_INDEX_URL="$PYPI_MIRROR/simple" uv sync --dev --frozen --quiet --extra m6
 ok "environment ready in $APP/.venv"
 
 # ------------------------------------------------------------------- web build

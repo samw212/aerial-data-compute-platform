@@ -618,3 +618,19 @@ def test_resolve_sensor_adapts_a_table_entry_to_the_frame():
     assert estimated is False, "it is in the table; nothing was guessed"
     assert s is not None
     assert s.sensor_h_mm == pytest.approx(6.17 * 2250 / 4000)
+
+
+def test_unscorable_imagery_raises_rather_than_reporting_100_percent_blur():
+    """C14. A missing decoder is a deployment fault, not a property of the flight.
+
+    Pillow was absent on the instance, every frame failed to decode, each was
+    recorded as sharpness 0, and the report announced that 100% of the flight was
+    blurred and blocked it. It blamed the imagery for a missing library.
+    """
+    from groma_capture.quality import ScoringUnavailableError
+
+    assert issubclass(ScoringUnavailableError, RuntimeError)
+
+    # The gate itself still treats a genuinely dark frame as blurred, which is right.
+    dark = [AssessedImage(filename="d.jpg", sharpness=0.0, clipped_fraction=0.0)]
+    assert apply_gates(dark, sharpness_floor=8.0)[0].state.value == "rejected_blur"

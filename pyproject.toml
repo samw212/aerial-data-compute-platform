@@ -18,6 +18,12 @@ dependencies = [
     "groma-segment",
 ]
 
+[project.optional-dependencies]
+# Extras for the milestones that are actually built, so that deployment can install
+# what it needs without dragging in open3d or py3dtiles for milestones that are
+# still skeletons. Add a line here when a milestone goes live.
+m6 = ["groma-capture[m6]"]
+
 [dependency-groups]
 dev = [
     # The CLI and API are apps, so the packages never depend on them; they are

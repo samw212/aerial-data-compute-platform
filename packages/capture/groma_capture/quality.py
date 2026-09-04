@@ -102,12 +102,31 @@ def to_greyscale(rgb: np.ndarray) -> np.ndarray:
     return 0.299 * a[..., 0] + 0.587 * a[..., 1] + 0.114 * a[..., 2]
 
 
+class ScoringUnavailableError(RuntimeError):
+    """Raised when frames cannot be scored at all, as opposed to scoring badly.
+
+    The distinction matters more than it looks. When Pillow was missing on the
+    instance, every frame failed to decode, was recorded as sharpness 0, and the QA
+    report announced that 100% of the flight was blurred and blocked it. The report
+    blamed the imagery for a missing library. A cause that is not the imagery must
+    never be reported as a property of the imagery.
+    """
+
+
 def score_file(path: str, *, width: int = DOWNSCALE_WIDTH) -> tuple[float, float]:
     """Return (sharpness, clipped_fraction) for an image on disk.
 
-    Needs Pillow, which is installed by the `m6` extra.
+    Needs Pillow, which the `m6` extra installs. Its absence raises
+    `ScoringUnavailableError` rather than returning a score, so that a deployment fault
+    surfaces as a deployment fault.
     """
-    from PIL import Image  # type: ignore[import-not-found]  # lazy: pillow is an m6 extra
+    try:
+        from PIL import Image  # type: ignore[import-not-found]  # lazy: pillow is an m6 extra
+    except ImportError as exc:  # pragma: no cover - exercised by the deployment, not the suite
+        raise ScoringUnavailableError(
+            "Pillow is not installed, so image quality cannot be scored. Install the "
+            "capture extra: uv sync --extra m6"
+        ) from exc
 
     with Image.open(path) as im:
         im = im.convert("RGB")
@@ -124,6 +143,7 @@ __all__ = [
     "DEFAULT_SHARPNESS_FLOOR",
     "DOWNSCALE_WIDTH",
     "LAPLACIAN_KERNEL",
+    "ScoringUnavailableError",
     "clipped_fraction",
     "laplacian",
     "laplacian_variance",
