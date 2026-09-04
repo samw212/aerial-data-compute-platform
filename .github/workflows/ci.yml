@@ -34,6 +34,8 @@ jobs:
           node-version: 20
           cache: npm
           cache-dependency-path: apps/web/package-lock.json
+      - name: Generate the TypeScript contracts (gitignored; the web app imports them)
+        run: uv run python scripts/generate_ts_types.py apps/web/src/api/contracts.ts
       - name: Web typecheck and lint
         working-directory: apps/web
         run: npm ci --no-audit --no-fund && npx tsc -b --noEmit && npx eslint src --ext .ts,.tsx
@@ -69,10 +71,10 @@ jobs:
           uv run python scripts/author_site_alpha.py
           git diff --exit-code fixtures/sites/site_alpha.json
 
-      - name: TypeScript contracts are up to date
+      - name: TypeScript contracts generate cleanly (the file is gitignored; lint typechecks it)
         run: |
           uv run python scripts/generate_ts_types.py apps/web/src/api/contracts.ts
-          git diff --exit-code apps/web/src/api/contracts.ts
+          test -s apps/web/src/api/contracts.ts
       - name: Kernel parity fixture is up to date
         run: |
           uv run python scripts/make_kernel_fixture.py

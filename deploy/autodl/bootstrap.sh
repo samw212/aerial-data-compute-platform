@@ -111,6 +111,8 @@ ok "environment ready in $APP/.venv"
 
 # ------------------------------------------------------------------- web build
 say "Building the web app"
+# apps/web/src/api/contracts.ts is generated from packages/contracts and gitignored.
+uv run python scripts/generate_ts_types.py apps/web/src/api/contracts.ts >/dev/null
 cd "$APP/apps/web"
 npm config set registry "${GROMA_NPM_REGISTRY:-https://registry.npmmirror.com}" >/dev/null
 npm ci --silent --no-audit --no-fund >"$LOGS/npm.log" 2>&1 || { tail -20 "$LOGS/npm.log"; fail "npm ci failed; see $LOGS/npm.log"; }
