@@ -103,7 +103,7 @@ def test_uncertainty_has_no_default() -> None:
     with pytest.raises(ValidationError):
         Measurement(
             id="m1",
-            site_id="s1",
+            venue_id="s1",
             survey_id="sv1",
             kind="distance",
             value=47.82,
@@ -118,11 +118,11 @@ def test_scale_free_survey_blocks_dimensioning() -> None:
     The API returns 409 on a measurement against such a survey; this is the flag
     that decision reads.
     """
-    scale_free = Survey(id="a", site_id="s", name="no georef", georef=GeorefMethod.NONE)
+    scale_free = Survey(id="a", venue_id="s", name="no georef", georef=GeorefMethod.NONE)
     assert not scale_free.dimensioning_allowed
 
     for method in (GeorefMethod.RTK, GeorefMethod.PPK, GeorefMethod.GCP, GeorefMethod.SCALE_BAR):
-        assert Survey(id="a", site_id="s", name="x", georef=method).dimensioning_allowed
+        assert Survey(id="a", venue_id="s", name="x", georef=method).dimensioning_allowed
 
 
 def test_only_accepted_structures_occlude() -> None:

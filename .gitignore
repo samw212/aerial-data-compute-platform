@@ -27,3 +27,7 @@ fixtures/recon/*/*.tif
 .env
 *.local
 .DS_Store
+
+# local-only files (never commit: AUTODL.md holds the instance login)
+AUTODL.md
+SPEC.md

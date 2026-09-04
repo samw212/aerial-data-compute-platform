@@ -7,4 +7,4 @@ in groma_coverage.kernel and is recorded per coverage run.
 
 from typing import Final
 
-CONTRACTS_VERSION: Final[str] = "0.1.0"
+CONTRACTS_VERSION: Final[str] = "0.2.0"

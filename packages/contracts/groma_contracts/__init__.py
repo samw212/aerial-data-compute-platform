@@ -4,6 +4,7 @@ This package depends on nothing else in Groma. TypeScript types are generated fr
 it by `make contracts-ts`; never hand-write a duplicate (CLAUDE.md, Architecture).
 """
 
+from groma_contracts.auth import LoginRequest, Role, SessionInfo, User, UserCreate, UserUpdate
 from groma_contracts.camera import (
     DORI_PX_PER_M,
     DORI_TIERS_HARDEST_FIRST,
@@ -31,15 +32,24 @@ from groma_contracts.measurement import (
     SnapMode,
     format_measurement,
 )
+from groma_contracts.org import (
+    Facility,
+    FacilityHealth,
+    FacilityKind,
+    Organisation,
+    Venue,
+    VenueSummary,
+)
 from groma_contracts.scenario import Scenario, Tent
 from groma_contracts.site import (
     AuthoredStructure,
     HeightDatum,
-    Site,
     SiteFixture,
     SiteOrigin,
 )
 from groma_contracts.structure import (
+    Evidence,
+    MountingType,
     MountPoint,
     RejectReason,
     ReviewState,
@@ -73,7 +83,11 @@ __all__ = [
     "CoverageStats",
     "CylinderPrim",
     "DoriTier",
+    "Evidence",
     "ExtrudedPolyline",
+    "Facility",
+    "FacilityHealth",
+    "FacilityKind",
     "Gcp",
     "GcpObservation",
     "GeorefMethod",
@@ -83,15 +97,19 @@ __all__ = [
     "JobKind",
     "JobProgress",
     "JobStatus",
+    "LoginRequest",
     "Measurement",
     "MeasurementKind",
     "MountPoint",
+    "MountingType",
+    "Organisation",
     "Primitive",
     "RejectReason",
     "ReviewState",
+    "Role",
     "Scenario",
     "SensorSpec",
-    "Site",
+    "SessionInfo",
     "SiteFixture",
     "SiteOrigin",
     "SnapMode",
@@ -101,6 +119,11 @@ __all__ = [
     "Survey",
     "SurveyStatus",
     "Tent",
+    "User",
+    "UserCreate",
+    "UserUpdate",
     "Vec3",
+    "Venue",
+    "VenueSummary",
     "format_measurement",
 ]

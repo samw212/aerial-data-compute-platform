@@ -84,7 +84,7 @@ class AccuracyReport(BaseModel):
 
 class Survey(BaseModel):
     id: str
-    site_id: str
+    venue_id: str
     name: str
     flown_at: date | None = None
     platform: str | None = None

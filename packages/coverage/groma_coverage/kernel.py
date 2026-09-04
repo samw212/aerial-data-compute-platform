@@ -27,7 +27,7 @@ from groma_coverage.terrain import eval_heights, terrain_blocks
 from groma_coverage.types import CoverageResult, Grid, Occluder, Terrain
 from groma_geo.optics import camera_basis, f_px, hfov_rad, vfov_rad
 
-KERNEL_VERSION: Final[str] = "1.0.0"
+KERNEL_VERSION: Final[str] = "1.1.0"
 
 
 def compute_coverage(

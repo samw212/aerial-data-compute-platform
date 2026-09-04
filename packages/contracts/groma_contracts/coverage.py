@@ -96,9 +96,13 @@ class CoverageRun(BaseModel):
     method: Literal["raycast", "shadowmap"]
     kernel_version: str
     stats: CoverageStats
+    include_seasonal: bool = True
     grid_uri: str | None = None
+    blind_polygons: list[list[tuple[float, float]]] = Field(default_factory=list)
+    """Plan-view rings in local ENU metres (x, z)."""
     computed_at: datetime | None = None
     duration_ms: int | None = None
+    created_by: str | None = None
 
 
 __all__ = [

@@ -41,6 +41,16 @@ class RejectReason(StrEnum):
     DUPLICATE = "duplicate"
 
 
+class Evidence(BaseModel):
+    """One source image that shows a structure, with the bounding box in pixels."""
+
+    model_config = ConfigDict(frozen=True)
+
+    image_id: str
+    bbox: tuple[float, float, float, float]
+    """x0, y0, x1, y1 in image pixels."""
+
+
 class Structure(BaseModel):
     id: str
     survey_id: str
@@ -57,8 +67,22 @@ class Structure(BaseModel):
     fit_rmse_m: float | None = None
     point_count: int | None = None
     origin: Literal["extracted", "manual", "adjusted"] = "extracted"
+    view_count: int | None = None
+    """Source images that saw it, from the poses (build spec 10.10)."""
+    mean_incidence_deg: float | None = None
+    accuracy_m: float | None = None
+    """The build spec 10.6 quadrature sum for a point on this structure."""
+    evidence: list[Evidence] = Field(default_factory=list)
+    """Best source views, for the review UI."""
     reviewed_by: str | None = None
     reviewed_at: datetime | None = None
+
+    @property
+    def insufficient_for_mount_design(self) -> bool:
+        """Build spec 10.10: accepted as an occluder, refused as a mount."""
+        return (self.view_count is not None and self.view_count < 20) or (
+            self.accuracy_m is not None and self.accuracy_m > 0.10
+        )
 
     @property
     def occludes(self) -> bool:
@@ -66,20 +90,44 @@ class Structure(BaseModel):
         return self.state is ReviewState.ACCEPTED
 
 
-class MountPoint(BaseModel):
-    """A place a camera can physically go, on an accepted mountable structure."""
+class MountingType(StrEnum):
+    POLE_CLAMP = "pole_clamp"
+    WALL_BRACKET = "wall_bracket"
+    CORNER_BRACKET = "corner_bracket"
+    NEW_MAST = "new_mast"
 
-    model_config = ConfigDict(frozen=True)
+
+class MountPoint(BaseModel):
+    """A place a camera can physically go. Build spec 12.6, 12.7.
+
+    `structure_id` is None for a proposed new mast; the proposed structure row is
+    created alongside so that the mast you are about to install occludes too.
+    """
 
     id: str
-    structure_id: str
+    venue_id: str
+    structure_id: str | None = None
     position: Vec3
+    """Local ENU metres, Y up."""
+    normal: Vec3 | None = None
+    """Surface normal at the mount face, for bracket direction."""
+    origin: Literal["extracted", "manual", "proposed_structure"] = "extracted"
+    mounting_type: MountingType | None = None
+    height_agl_m: float
     max_load_kg: float | None = None
+    cable_run_m: float | None = None
+    accuracy_m: float | None = None
+    confidence: float = Field(default=1.0, ge=0, le=1)
+    state: ReviewState = ReviewState.PENDING
     label: str | None = None
+    created_by: str | None = None
+    created_at: datetime | None = None
 
 
 __all__ = [
+    "Evidence",
     "MountPoint",
+    "MountingType",
     "RejectReason",
     "ReviewState",
     "Structure",

@@ -3,7 +3,7 @@ name = "groma-contracts"
 version = "0.1.0"
 description = "The single source of truth for Groma data shapes. Depends on nothing in Groma."
 requires-python = ">=3.12"
-dependencies = ["pydantic>=2.7"]
+dependencies = ["pydantic[email]>=2.7"]
 
 [build-system]
 requires = ["hatchling"]

@@ -1,5 +1,5 @@
 {
-  "kernel_version": "1.0.0",
+  "kernel_version": "1.1.0",
   "site": "site_alpha",
   "parameters": {
     "grid_spacing_m": 0.5,
