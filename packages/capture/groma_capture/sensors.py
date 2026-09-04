@@ -97,6 +97,38 @@ def estimate_sensor(
     )
 
 
+def adapt_to_resolution(spec: SensorSpec, res_x: int, res_y: int) -> SensorSpec:
+    """Fit a table entry to the resolution the image was actually taken at.
+
+    A table entry records the sensor at its native, full-frame resolution. A drone
+    shooting 16:9 on a 4:3 sensor produces 4000x2250 from a 4000x3000 sensor, and it
+    does so by reading fewer rows, not by squashing the image: the full sensor width
+    is used and the height is cropped. Taking the native height would overstate the
+    vertical field of view by a third, which lands directly in the along-track
+    footprint and therefore in the front overlap estimate.
+
+    So: when the aspect ratio matches, only the pixel count differs and the physical
+    dimensions are unchanged. When it does not, the width is assumed fully used and
+    the height follows from the new aspect ratio, which holds for square pixels.
+    """
+    if res_x <= 0 or res_y <= 0:
+        return spec
+    native = spec.res_x / spec.res_y
+    actual = res_x / res_y
+    if abs(native - actual) <= 1e-3 * native:
+        height = spec.sensor_h_mm
+    else:
+        height = spec.sensor_w_mm * res_y / res_x
+    return SensorSpec(
+        make=spec.make,
+        model=spec.model,
+        sensor_w_mm=spec.sensor_w_mm,
+        sensor_h_mm=height,
+        res_x=res_x,
+        res_y=res_y,
+    )
+
+
 def resolve_sensor(
     *,
     make: str | None,
@@ -114,7 +146,7 @@ def resolve_sensor(
     """
     known = (table or default_table()).get(make, model)
     if known is not None:
-        return known, False
+        return adapt_to_resolution(known, res_x, res_y), False
     return estimate_sensor(
         make=make,
         model=model,
@@ -128,6 +160,7 @@ def resolve_sensor(
 __all__ = [
     "FULL_FRAME_WIDTH_MM",
     "SensorTable",
+    "adapt_to_resolution",
     "default_table",
     "estimate_sensor",
     "resolve_sensor",

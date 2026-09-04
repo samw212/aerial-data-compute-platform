@@ -73,12 +73,26 @@ class ExifRecord:
 
 
 def _num(raw: dict[str, object], *keys: str) -> float | None:
+    """First numeric value among `keys`, accepting numbers written as strings.
+
+    `-n` stops exiftool converting numbers into human-readable text, but it does not
+    make the XMP tags numeric: `drone-dji:RelativeAltitude` arrives as the string
+    "+39.80", sign included, because XMP has no number type. Reading it as a number
+    is not optional. Without the relative altitude there is no ground footprint, so
+    there is no overlap estimate and no GSD, and the QA report silently degrades to
+    "could not be estimated" on perfectly good imagery.
+    """
     for k in keys:
         v = raw.get(k)
         if isinstance(v, bool):
             continue
         if isinstance(v, (int, float)):
             return float(v)
+        if isinstance(v, str):
+            try:
+                return float(v.strip().lstrip("+"))
+            except ValueError:
+                continue
     return None
 
 

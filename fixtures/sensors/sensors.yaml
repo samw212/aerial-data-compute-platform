@@ -73,6 +73,18 @@ sensors:
     res_x: 4000
     res_y: 3000
   - make: DJI
+    model: FC300S            # Phantom 3 Standard
+    sensor_w_mm: 6.17
+    sensor_h_mm: 4.55
+    res_x: 4000
+    res_y: 3000
+  - make: DJI
+    model: FC300C            # Phantom 3 Standard, earlier board
+    sensor_w_mm: 6.17
+    sensor_h_mm: 4.55
+    res_x: 4000
+    res_y: 3000
+  - make: DJI
     model: FC300X            # Phantom 3 Professional
     sensor_w_mm: 6.17
     sensor_h_mm: 4.55

@@ -538,3 +538,83 @@ def test_the_absolute_minimum_catches_what_the_percentile_rule_cannot():
 
     qa = build_qa(gated, classify([-90.0] * 24), front_overlap=0.8, georef="rtk")
     assert any("rejected" in b for b in qa.blocking)
+
+
+# --- C14 faults found by running against real drone imagery -------------------
+
+
+def test_xmp_altitude_arrives_as_a_signed_string_and_must_still_parse():
+    """C14. exiftool -n leaves drone-dji tags as XMP strings like "+39.80".
+
+    Found on the Brighton Beach demo set. Reading these as absent costs the ground
+    footprint, and with it the overlap estimate and the GSD, on imagery that is
+    perfectly good. The QA report degraded to "could not be estimated" and blamed
+    the flight.
+    """
+    doc = json.dumps(
+        [
+            {
+                "SourceFile": "/f/DJI_0018.JPG",
+                "FileName": "DJI_0018.JPG",
+                "ImageWidth": 4000,
+                "ImageHeight": 2250,
+                "Make": "DJI",
+                "Model": "FC300S",
+                "FocalLength": 3.61,
+                "RelativeAltitude": "+39.80",
+                "AbsoluteAltitude": "+198.31",
+                "GimbalPitchDegree": -89.9,
+            }
+        ]
+    )
+    r = parse_exiftool_json(doc)[0]
+    assert r.relative_altitude_m == pytest.approx(39.80)
+    assert r.gps_alt_m == pytest.approx(198.31)
+
+
+def test_a_non_numeric_string_is_still_absent():
+    """C14. Parsing strings must not turn "unknown" into a number."""
+    doc = json.dumps(
+        [{"SourceFile": "/f/a.JPG", "FileName": "a.JPG", "ImageWidth": 10,
+          "ImageHeight": 10, "RelativeAltitude": "n/a"}]
+    )
+    assert parse_exiftool_json(doc)[0].relative_altitude_m is None
+
+
+def test_sixteen_by_nine_capture_crops_the_sensor_height():
+    """C14. 4000x2250 from a 4:3 sensor reads fewer rows at the full width.
+
+    Taking the native 4.55 mm height for a 16:9 frame overstates the vertical field
+    of view by a third, which lands straight in the along-track footprint and so in
+    the front overlap estimate.
+    """
+    from groma_capture.sensors import adapt_to_resolution
+
+    native = default_table().get("DJI", "FC300S")
+    assert native is not None and (native.res_x, native.res_y) == (4000, 3000)
+
+    cropped = adapt_to_resolution(native, 4000, 2250)
+    assert cropped.sensor_w_mm == pytest.approx(6.17), "the full width is still used"
+    assert cropped.sensor_h_mm == pytest.approx(6.17 * 2250 / 4000)
+    assert cropped.sensor_h_mm < native.sensor_h_mm
+
+
+def test_same_aspect_ratio_keeps_the_physical_dimensions():
+    """C14. A downscaled 4:3 image is the same sensor with fewer pixels."""
+    from groma_capture.sensors import adapt_to_resolution
+
+    native = default_table().get("DJI", "FC300S")
+    assert native is not None
+    half = adapt_to_resolution(native, 2000, 1500)
+    assert (half.sensor_w_mm, half.sensor_h_mm) == (native.sensor_w_mm, native.sensor_h_mm)
+    assert (half.res_x, half.res_y) == (2000, 1500)
+
+
+def test_resolve_sensor_adapts_a_table_entry_to_the_frame():
+    """C14. The whole point: a known aircraft shooting 16:9 is still 'known'."""
+    s, estimated = resolve_sensor(
+        make="DJI", model="FC300S", focal_mm=3.61, focal_35_mm=20.0, res_x=4000, res_y=2250
+    )
+    assert estimated is False, "it is in the table; nothing was guessed"
+    assert s is not None
+    assert s.sensor_h_mm == pytest.approx(6.17 * 2250 / 4000)
