@@ -14,9 +14,19 @@ from pydantic import BaseModel, Field
 
 
 class MeasurementKind(StrEnum):
+    """Build spec 14.2."""
+
     DISTANCE = "distance"
+    HORIZONTAL_DISTANCE = "horizontal_distance"
+    VERTICAL_DIFFERENCE = "vertical_difference"
     HEIGHT = "height"
+    """Above local ground."""
+    POLYLINE_LENGTH = "polyline_length"
     AREA = "area"
+    FOOTPRINT_AREA = "footprint_area"
+    VOLUME = "volume"
+    SLOPE = "slope"
+    CLEARANCE = "clearance"
     ELEVATION_DIFFERENCE = "elevation_difference"
 
 
@@ -32,7 +42,7 @@ class SnapMode(StrEnum):
 
 class Measurement(BaseModel):
     id: str
-    site_id: str
+    venue_id: str
     survey_id: str
     """Measurements belong to a specific survey forever. Re-flying does not move
     an old measurement; it produces a new one."""
@@ -42,6 +52,8 @@ class Measurement(BaseModel):
     """One standard deviation, in `unit`. Deliberately required."""
     unit: str
     snap_mode: SnapMode
+    points: list[tuple[float, float, float]] = Field(default_factory=list)
+    """The snapped points, local ENU metres, Y up."""
     created_by: str | None = None
     created_at: datetime | None = None
 

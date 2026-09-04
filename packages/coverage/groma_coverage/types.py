@@ -6,6 +6,8 @@ package has to run identically in the worker, the CLI and the browser via WASM.
 
 from __future__ import annotations
 
+import math
+from collections.abc import Sequence
 from dataclasses import dataclass, field
 
 import numpy as np
@@ -233,7 +235,43 @@ def _cell_count(extent: float, spacing: float) -> int:
     return max(count, 1)
 
 
-@dataclass(frozen=True)
+def rasterise_polygon(
+    ring: Sequence[tuple[float, float]],
+    xs: F64,
+    zs: F64,
+) -> npt.NDArray[np.bool_]:
+    """Even-odd point-in-polygon over a grid of sample points, vectorised.
+
+    `ring` is a plan-view polygon as (x, z) pairs; `xs`, `zs` are the sample
+    coordinates, any matching shape. A cell is inside when a ray cast along +X from
+    the sample crosses the boundary an odd number of times. Written out rather than
+    delegating to Shapely so the kernel stays installable anywhere and the
+    TypeScript port can do the identical thing.
+    """
+    pts = [(float(x), float(z)) for x, z in ring]
+    if len(pts) >= 2 and pts[0] == pts[-1]:
+        pts = pts[:-1]
+    if len(pts) < 3:
+        raise ValueError("a polygon needs at least three distinct vertices")
+
+    x = np.asarray(xs, dtype=np.float64)
+    z = np.asarray(zs, dtype=np.float64)
+    inside = np.zeros(x.shape, dtype=bool)
+    n = len(pts)
+    for k in range(n):
+        x1, z1 = pts[k]
+        x2, z2 = pts[(k + 1) % n]
+        if z1 == z2:
+            continue
+        crosses = (z1 > z) != (z2 > z)
+        # x of the edge at height z; only evaluated where the edge spans z.
+        with np.errstate(divide="ignore", invalid="ignore"):
+            x_at = x1 + (z - z1) * (x2 - x1) / (z2 - z1)
+        inside ^= crosses & (x < x_at)
+    return inside
+
+
+@dataclass(frozen=True, eq=False)
 class Grid:
     """The sample grid for one coverage run, in local ENU metres.
 
@@ -241,6 +279,14 @@ class Grid:
     (x_min, z_min). The sample sits at the cell's lower corner rather than its
     middle, which is what build spec 6.1 pins down: "Row 0 is z_min, column 0 is
     x_min. Never change this ordering; the heatmap texture depends on it."
+
+    `mask` marks the cells inside the facility's area of interest. Every
+    percentage is of the masked area; a masked-out cell is not blind, it is not
+    in scope (build spec 6.3). None means every cell is in scope.
+
+    `eq=False` because a generated equality would compare the mask arrays with
+    `==`, and NumPy raises on that rather than answering. `__eq__` below compares
+    the extent, spacing and mask properly.
     """
 
     x_min: float
@@ -248,12 +294,39 @@ class Grid:
     z_min: float
     z_max: float
     spacing: float
+    mask: npt.NDArray[np.bool_] | None = None
 
     def __post_init__(self) -> None:
         if self.spacing <= 0:
             raise ValueError(f"spacing must be positive, got {self.spacing}")
         if self.x_max <= self.x_min or self.z_max <= self.z_min:
             raise ValueError("grid extent must be positive in both axes")
+        if self.mask is not None:
+            mask = np.asarray(self.mask, dtype=bool)
+            if mask.shape != (self.nz, self.nx):
+                raise ValueError(
+                    f"mask has shape {mask.shape}, expected (nz, nx) = {(self.nz, self.nx)}"
+                )
+            object.__setattr__(self, "mask", mask)
+
+    def __eq__(self, other: object) -> bool:
+        if not isinstance(other, Grid):
+            return NotImplemented
+        same = (
+            self.x_min == other.x_min
+            and self.x_max == other.x_max
+            and self.z_min == other.z_min
+            and self.z_max == other.z_max
+            and self.spacing == other.spacing
+        )
+        if not same:
+            return False
+        if self.mask is None or other.mask is None:
+            return self.mask is None and other.mask is None
+        return bool(np.array_equal(self.mask, other.mask))
+
+    def __hash__(self) -> int:
+        return hash((self.x_min, self.x_max, self.z_min, self.z_max, self.spacing))
 
     @property
     def nx(self) -> int:
@@ -268,8 +341,26 @@ class Grid:
         return self.nx * self.nz
 
     @property
+    def cells_in_aoi(self) -> int:
+        """Cells that count towards any percentage."""
+        if self.mask is None:
+            return self.cells
+        return int(np.count_nonzero(self.mask))
+
+    @property
     def cell_area_m2(self) -> float:
         return self.spacing * self.spacing
+
+    @property
+    def area_m2(self) -> float:
+        """Area of the region percentages are quoted against."""
+        return self.cells_in_aoi * self.cell_area_m2
+
+    def in_scope(self) -> npt.NDArray[np.bool_]:
+        """The mask, or all-True when there is none."""
+        if self.mask is None:
+            return np.ones((self.nz, self.nx), dtype=bool)
+        return self.mask
 
     def centres(self) -> tuple[F64, F64]:
         """(X, Z) of shape (nz, nx). Row 0 is z_min, column 0 is x_min.
@@ -279,6 +370,33 @@ class Grid:
         xs = self.x_min + np.arange(self.nx, dtype=np.float64) * self.spacing
         zs = self.z_min + np.arange(self.nz, dtype=np.float64) * self.spacing
         return np.meshgrid(xs, zs)
+
+    @classmethod
+    def from_facility(
+        cls,
+        boundary: Sequence[tuple[float, float]],
+        spacing: float,
+        pad_m: float = 2.0,
+    ) -> Grid:
+        """A grid over a facility polygon (plan-view (x, z), local ENU) plus padding,
+        with the mask rasterised from the polygon. Build spec 6.1.
+
+        The extent is snapped outwards to whole cells so that the spacing divides
+        it exactly, which keeps T4 (grid invariance) meaningful for facility grids.
+        """
+        pts = [(float(x), float(z)) for x, z in boundary]
+        xs = [p[0] for p in pts]
+        zs = [p[1] for p in pts]
+        x_min = math.floor((min(xs) - pad_m) / spacing) * spacing
+        z_min = math.floor((min(zs) - pad_m) / spacing) * spacing
+        x_max = math.ceil((max(xs) + pad_m) / spacing) * spacing
+        z_max = math.ceil((max(zs) + pad_m) / spacing) * spacing
+        grid = cls(x_min=x_min, x_max=x_max, z_min=z_min, z_max=z_max, spacing=spacing)
+        cx, cz = grid.centres()
+        # Sample at the cell middle for the inside test, so a polygon edge that
+        # runs along a cell boundary does not flip a whole row of cells.
+        mask = rasterise_polygon(pts, cx + 0.5 * spacing, cz + 0.5 * spacing)
+        return cls(x_min=x_min, x_max=x_max, z_min=z_min, z_max=z_max, spacing=spacing, mask=mask)
 
 
 @dataclass(eq=False)
@@ -312,4 +430,5 @@ __all__ = [
     "Occluder",
     "Primitive",
     "Terrain",
+    "rasterise_polygon",
 ]

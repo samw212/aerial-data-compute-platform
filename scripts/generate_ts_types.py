@@ -112,7 +112,13 @@ def is_tag(annotation: object) -> bool:
 def render_model(cls: type[BaseModel]) -> str:
     lines = [f"export interface {cls.__name__} {{"]
     for name, field in cls.model_fields.items():
-        optional = not field.is_required() and not is_tag(field.annotation)
+        # Optional in TypeScript only when the Python default is None: the server
+        # always fills a field that has a real default (a status, a count, an
+        # empty list), so the viewer may rely on it. A None default is genuinely
+        # absent-or-null on the wire.
+        optional = (
+            not field.is_required() and field.default is None and not is_tag(field.annotation)
+        )
         rendered = ts_type(field.annotation)
         suffix = "?" if optional else ""
         if field.description:

@@ -190,9 +190,11 @@ points nowhere near the cause.
 
 ## Current milestone
 
-M1 — Coverage kernel is complete (T1–T14 pass, benchmark under 800 ms).
-Next: **M2 — Synthetic ground truth** (`scripts/synthesise_site.py`,
-`scripts/render_survey.py`).
+Phase 1 of `docs/PLAN.md` is complete and deployed: M1 kernel (T1–T16, benchmark
+166 ms), M3 web app, M4 API and PostGIS, M5 worker (coverage jobs; PDF report still
+open), M15 deployment on the AutoDL instance.
+Next: **Phase 2 — M2 synthetic ground truth** (`scripts/synthesise_site.py`,
+`scripts/render_survey.py`) and **M6 capture ingest**.
 
 See `docs/STATUS.md` for what is built and what is stubbed.
 

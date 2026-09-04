@@ -32,8 +32,12 @@ def summarise(
     """
     tier_thresholds = tiers if tiers is not None else DORI_PX_PER_M
 
-    ppm = result.ppm
-    count = result.count
+    # Only cells inside the facility polygon count. A masked-out cell is not
+    # blind and it is not covered; it is not in scope (build spec 6.3, T15).
+    scope = result.grid.in_scope()
+    ppm = result.ppm[scope]
+    count = result.count[scope]
+    best = result.best_camera[scope]
     cell_area = result.grid.cell_area_m2
     cells = int(ppm.size)
     area = cells * cell_area
@@ -51,7 +55,6 @@ def summarise(
     per_camera: dict[str, float] = {}
     if cameras:
         unique = seen & (count == 1)
-        best = result.best_camera
         for index, cam in enumerate(cameras):
             n = int(np.count_nonzero(unique & (best == index)))
             per_camera[cam.id] = float(n * cell_area)
@@ -99,22 +102,25 @@ def compare(
 
     tier_thresholds = tiers if tiers is not None else DORI_PX_PER_M
     cell_area = a.grid.cell_area_m2
+    scope = a.grid.in_scope()
+    ppm_a = a.ppm[scope]
+    ppm_b = b.ppm[scope]
 
     tier_delta = {
         tier: float(
-            (np.count_nonzero(b.ppm >= threshold) - np.count_nonzero(a.ppm >= threshold))
+            (np.count_nonzero(ppm_b >= threshold) - np.count_nonzero(ppm_a >= threshold))
             * cell_area
         )
         for tier, threshold in tier_thresholds.items()
     }
 
-    seen_a = a.count > 0
-    seen_b = b.count > 0
+    seen_a = a.count[scope] > 0
+    seen_b = b.count[scope] > 0
     blind_a = int(np.count_nonzero(~seen_a))
     blind_b = int(np.count_nonzero(~seen_b))
 
-    mean_a = float(a.ppm[seen_a].mean()) if np.any(seen_a) else 0.0
-    mean_b = float(b.ppm[seen_b].mean()) if np.any(seen_b) else 0.0
+    mean_a = float(ppm_a[seen_a].mean()) if np.any(seen_a) else 0.0
+    mean_b = float(ppm_b[seen_b].mean()) if np.any(seen_b) else 0.0
 
     return CoverageDelta(
         run_a=run_a,
@@ -135,7 +141,8 @@ def blind_polygons(
 
     Returns plan-view rings in local ENU metres. Regions smaller than
     `min_area_m2` are dropped: a report full of half-metre specks between two
-    cameras is noise, and the operator cannot act on it.
+    cameras is noise, and the operator cannot act on it. Cells outside the grid's
+    mask are never blind: they are out of scope (T15).
 
     This is a connected-component trace rather than marching squares. Blind cells
     are a discrete set, and the boundary that matters is the boundary of the cells
@@ -144,7 +151,7 @@ def blind_polygons(
     renderer smooths this ring; the area quoted in the report comes from the cell
     count, never from the polygon.
     """
-    blind = result.count == 0
+    blind = (result.count == 0) & result.grid.in_scope()
     if not np.any(blind):
         return []
 

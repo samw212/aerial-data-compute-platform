@@ -1,11 +1,10 @@
-"""Site and the origin that defines the Compute frame. Build spec 5.
+"""Authored site fixtures and the origin that defines the Compute frame. Build spec 5, 16.
 
 Every stored height is labelled with its datum. Mixing ellipsoidal, orthometric and
 above-ground-level heights in one model puts cameras tens of metres underground,
 and the symptom appears nowhere near the cause (CLAUDE.md, known trap 5).
 """
 
-from datetime import datetime
 from enum import StrEnum
 
 from pydantic import BaseModel, ConfigDict, Field
@@ -22,23 +21,8 @@ class HeightDatum(StrEnum):
     """An arbitrary local vertical datum. Not comparable across sites."""
 
 
-class Site(BaseModel):
-    model_config = ConfigDict(frozen=True)
-
-    id: str
-    name: str
-    srid: int
-    """Projected CRS of the Storage frame, e.g. 2326 for Hong Kong 1980 Grid."""
-    origin_x: float
-    origin_y: float
-    origin_z: float
-    """Storage-frame origin that the Compute frame is rebased to, once, on load."""
-    height_datum: HeightDatum
-    created_at: datetime | None = None
-
-
 class SiteOrigin(BaseModel):
-    """The rebasing parameters on their own, for code that has no Site row."""
+    """The rebasing parameters on their own, for code that has no Venue row."""
 
     model_config = ConfigDict(frozen=True)
 
@@ -100,7 +84,6 @@ class SiteFixture(BaseModel):
 __all__ = [
     "AuthoredStructure",
     "HeightDatum",
-    "Site",
     "SiteFixture",
     "SiteOrigin",
 ]

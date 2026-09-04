@@ -25,6 +25,7 @@ dev = [
     # and can run the service.
     "groma-cli",
     "groma-api",
+    "groma-worker",
     # Starlette's TestClient wants httpx2; the older httpx raises a deprecation
     # warning, which this suite treats as an error.
     "httpx2",
@@ -48,12 +49,14 @@ groma-tiles = { workspace = true }
 groma-segment = { workspace = true }
 groma-cli = { workspace = true }
 groma-api = { workspace = true }
+groma-worker = { workspace = true }
 
 [tool.pytest.ini_options]
 testpaths = ["tests"]
 pythonpath = ["."]
 addopts = "-q --strict-markers --strict-config"
 markers = [
+    "integration: needs GROMA_TEST_DATABASE_URL (a real PostGIS)",
     "slow: excluded from the unit suite; must stay under 5 seconds (build-spec 18)",
     "bench: performance benchmarks, run by `make kernel-bench`",
 ]
@@ -99,6 +102,7 @@ known-first-party = [
 
 [tool.ruff.lint.per-file-ignores]
 "tests/*" = ["E501"]
+"scripts/make_kernel_fixture.py" = ["E501"]
 # Nested conditionals whose branches carry separate reasons read better than one
 # combined condition, and these two files are checks-with-explanations throughout.
 "tests/unit/test_import_graph.py" = ["SIM102"]
@@ -120,11 +124,18 @@ mypy_path = [
     "packages/recon",
     "packages/tiles",
     "packages/segment",
+    "apps/api",
+    "apps/worker",
+    "apps/cli",
 ]
-exclude = ["^\\.venv/", "^migrations/"]
+exclude = ["^\\.venv/", "^migrations/", "^apps/web/"]
 
 [[tool.mypy.overrides]]
-module = ["tests.*", "scripts.*"]
+module = ["shapely.*", "geoalchemy2.*", "arq.*"]
+ignore_missing_imports = true
+
+[[tool.mypy.overrides]]
+module = ["tests.*", "scripts.*", "migrations.*"]
 strict = false
 disallow_untyped_defs = false
 
