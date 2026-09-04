@@ -8,7 +8,7 @@ import { Shell } from "../app/Shell";
 import { Bar, Chips, Dock, DockFooter, DockHeader, DockTabs, Empty, Hud, Kv, Strip, Tag, ToolRail, ViewControl } from "../components/ui";
 import { lngLatToLocal, localToLngLat, ringToLngLat, storageRingToLocal } from "../geo";
 import { GeoLayer, MapView } from "../map/MapView";
-import { STATE_COLOR, ringsFC, structuresFC } from "../map/features";
+import { STATE_COLOR, primitiveRing, ringsFC, structuresFC } from "../map/features";
 import { Scene3D } from "../scene/Scene3D";
 import { useUi } from "../state/ui";
 import { STATUS_TONE, useStageContext } from "./useStageContext";
@@ -71,7 +71,17 @@ export function ModelStage() {
     return { x_min: Math.min(...xs) - 15, x_max: Math.max(...xs) + 15, z_min: Math.min(...zs) - 10, z_max: Math.max(...zs) + 10 };
   }, [facilityRings]);
   const center: [number, number] = venue ? localToLngLat(venue, 0, 0) : [114.17, 22.32];
-  const bounds = useMemo(() => (venue && facilityRings[0] ? ringToLngLat(venue, facilityRings[0]) : venue ? ringToLngLat(venue, [[-70, -45], [70, -45], [70, 45], [-70, 45]]) : null), [venue, facilityRings]);
+  // Fit to everything under review, not just the pitch: the masts and fence runs
+  // sit on the site perimeter, outside the facility ring.
+  const bounds = useMemo(() => {
+    if (!venue) return null;
+    const pts: [number, number][] = [...(facilityRings[0] ?? [])];
+    for (const s of structures.data ?? []) pts.push(...primitiveRing(s.primitive));
+    if (!pts.length) return ringToLngLat(venue, [[-70, -45], [70, -45], [70, 45], [-70, 45]]);
+    const xs = pts.map((p) => p[0]), zs = pts.map((p) => p[1]);
+    const x0 = Math.min(...xs) - 4, x1 = Math.max(...xs) + 4, z0 = Math.min(...zs) - 4, z1 = Math.max(...zs) + 4;
+    return ringToLngLat(venue, [[x0, z0], [x1, z0], [x1, z1], [x0, z1]]);
+  }, [venue, facilityRings, structures.data]);
   const counts = useMemo(() => {
     const all = structures.data ?? [];
     return { total: all.length, pending: all.filter((s) => s.state === "pending").length };
@@ -82,14 +92,16 @@ export function ModelStage() {
       {ui.view === "3d" ? (
         <Scene3D extent={extent} structures={structures.data ?? []} cameras={[]} selected={ui.selection} onSelect={ui.select} />
       ) : (
-        <MapView center={center} zoom={17.5} bounds={bounds} onMouseMove={setCursor} onClick={(_, e) => {
+        <MapView center={center} zoom={17.5} bounds={bounds} padding={{ bottom: ui.stripOpen ? 200 : 60 }} onMouseMove={setCursor} onClick={(_, e) => {
           const f = e.target.queryRenderedFeatures(e.point, { layers: ["str-fill"] })[0];
           ui.select(f ? String(f.properties.id) : null);
         }}>
           {facFC && <GeoLayer id="facility" data={facFC} layers={[{ id: "fac-line", type: "line", paint: { "line-color": "#5ee7ff", "line-width": 1.5, "line-dasharray": [4, 3], "line-opacity": 0.8 } }]} />}
           {fc && <GeoLayer id="structures" data={fc} visible={ui.layers.structures} layers={[
             { id: "str-fill", type: "fill", paint: { "fill-color": ["get", "color"], "fill-opacity": ["case", ["==", ["get", "selected"], 1], 0.45, ["==", ["get", "porous"], 1], 0.08, 0.2] } },
-            { id: "str-line", type: "line", paint: { "line-color": ["get", "color"], "line-width": ["case", ["==", ["get", "selected"], 1], 2.5, 1.5], "line-dasharray": ["case", ["==", ["get", "state"], "rejected"], ["literal", [2, 2]], ["literal", [1, 0]]] } },
+            // line-dasharray cannot be data-driven in MapLibre, so rejected structures get their own dashed layer.
+            { id: "str-line", type: "line", filter: ["!=", ["get", "state"], "rejected"], paint: { "line-color": ["get", "color"], "line-width": ["case", ["==", ["get", "selected"], 1], 2.5, 1.5] } },
+            { id: "str-line-rejected", type: "line", filter: ["==", ["get", "state"], "rejected"], paint: { "line-color": ["get", "color"], "line-width": ["case", ["==", ["get", "selected"], 1], 2.5, 1.5], "line-dasharray": [2, 2] } },
             { id: "str-lbl", type: "symbol", minzoom: 18, layout: { "text-field": ["get", "name"], "text-size": 10.5, "text-offset": [0, 1.2] }, paint: { "text-color": "#98a2b3", "text-halo-color": "#0e1116", "text-halo-width": 1 } },
           ]} />}
         </MapView>

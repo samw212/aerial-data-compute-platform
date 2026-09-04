@@ -1,20 +1,38 @@
 /* Capture and Process stages. The viewport and dock frame are in place; the
  * footprint map, QA report and ODM console land with M6 and M7. */
 
+import { useMemo } from "react";
+import type { Venue } from "../api/contracts";
+import { useFacilities } from "../api/queries";
 import { Shell } from "../app/Shell";
 import { Dock, DockFooter, DockHeader, DockTabs, Empty, Hud, Tag } from "../components/ui";
-import { MapView } from "../map/MapView";
-import { localToLngLat } from "../geo";
+import { GeoLayer, MapView } from "../map/MapView";
+import { localToLngLat, storageRingToLngLat } from "../geo";
 import { STATUS_TONE, useStageContext } from "./useStageContext";
+
+/** The venue map with the facility outlines: the frame every survey stage shares. */
+function VenueMap({ venueId, venue }: { venueId?: string; venue?: Venue | null }) {
+  const facilities = useFacilities(venueId);
+  const fc = useMemo<GeoJSON.FeatureCollection>(() => ({
+    type: "FeatureCollection",
+    features: venue ? (facilities.data ?? []).map((f) => ({ type: "Feature", id: f.id, properties: { name: f.name }, geometry: { type: "Polygon", coordinates: [storageRingToLngLat(venue.srid, f.boundary)] } })) : [],
+  }), [venue, facilities.data]);
+  const mapCenter: [number, number] = venue ? localToLngLat(venue, 0, 0) : [114.17, 22.32];
+  const bounds = useMemo(() => (venue && facilities.data?.[0] ? storageRingToLngLat(venue.srid, facilities.data[0].boundary) : null), [venue, facilities.data]);
+  return (
+    <MapView center={mapCenter} zoom={17} bounds={bounds}>
+      <GeoLayer id="facilities" data={fc} layers={[{ id: "fac-line", type: "line", paint: { "line-color": "#5ee7ff", "line-width": 1.5, "line-dasharray": [4, 3], "line-opacity": 0.8 } }]} />
+    </MapView>
+  );
+}
 
 export function CaptureStage() {
   const ctx = useStageContext("Capture");
   const { venue, survey } = ctx;
   const qa = survey?.capture_qa;
-  const center: [number, number] = venue ? localToLngLat(venue, 0, 0) : [114.17, 22.32];
   return (
     <Shell crumb={`${venue?.name ?? "…"} · ${survey?.name ?? "…"}`} stages={ctx.links} status={survey && <Tag tone={STATUS_TONE[survey.status] ?? "mute"}>{survey.status.replace("_", " ")}</Tag>}>
-      <MapView center={center} zoom={17} />
+      <VenueMap venueId={ctx.venueId} venue={venue} />
       <Hud lines={["Image footprints, the flight line and the gallery arrive with capture ingest (M6)."]} />
       <Dock>
         <DockHeader eyebrow="Capture" title={survey?.name ?? "…"} tag={survey && <Tag tone={STATUS_TONE[survey.status] ?? "mute"}>{survey.status.replace("_", " ")}</Tag>} meta={survey ? `${survey.flown_at ?? "not flown"} · ${survey.platform ?? "—"} · ${survey.georef}` : undefined} />
@@ -41,10 +59,9 @@ export function ProcessStage() {
   const ctx = useStageContext("Process");
   const { venue, survey } = ctx;
   const acc = survey?.accuracy;
-  const center: [number, number] = venue ? localToLngLat(venue, 0, 0) : [114.17, 22.32];
   return (
     <Shell crumb={`${venue?.name ?? "…"} · ${survey?.name ?? "…"}`} stages={ctx.links} status={survey && <Tag tone={STATUS_TONE[survey.status] ?? "mute"}>{survey.status.replace("_", " ")}</Tag>}>
-      <MapView center={center} zoom={17} />
+      <VenueMap venueId={ctx.venueId} venue={venue} />
       <Hud lines={["Solved shots, the ODM console and the acceptance gates arrive with reconstruction (M7)."]} />
       <Dock>
         <DockHeader eyebrow="Process" title={survey?.name ?? "…"} tag={survey && <Tag tone={STATUS_TONE[survey.status] ?? "mute"}>{survey.status}</Tag>} meta={survey ? `engine ${survey.engine ?? "—"}` : undefined} />
@@ -56,8 +73,8 @@ export function ProcessStage() {
               <div><div className="lbl" style={{ fontSize: 9.5 }}>GSD</div><div className="m" style={{ fontSize: 16 }}>{acc.gsd_m != null ? `${(acc.gsd_m * 100).toFixed(1)} cm` : "—"}</div></div>
               <div><div className="lbl" style={{ fontSize: 9.5 }}>Reproj. RMSE</div><div className="m" style={{ fontSize: 16 }}>{acc.reproj_rmse_px?.toFixed(2) ?? "—"} px</div></div>
               <div><div className="lbl" style={{ fontSize: 9.5 }}>Registered</div><div className="m" style={{ fontSize: 16 }}>{acc.registered_images}/{acc.total_images}</div></div>
-              <div><div className="lbl" style={{ fontSize: 9.5 }}>Check-pt RMSE <span style={{ color: "var(--color-ok)" }}>honest</span></div><div className="m" style={{ fontSize: 16 }}>{acc.check_rmse_h_m != null ? `${(acc.check_rmse_h_m * 100).toFixed(1)} H · ${((acc.check_rmse_v_m ?? 0) * 100).toFixed(1)} V cm` : "none"}</div></div>
-              <div><div className="lbl" style={{ fontSize: 9.5 }}>Control RMSE <span style={{ color: "var(--color-warn)" }}>optimistic</span></div><div className="m" style={{ fontSize: 16, color: "var(--color-ink-2)" }}>{acc.gcp_rmse_h_m != null ? `${(acc.gcp_rmse_h_m * 100).toFixed(1)} H · ${((acc.gcp_rmse_v_m ?? 0) * 100).toFixed(1)} V cm` : "—"}</div></div>
+              <div><div className="lbl" style={{ fontSize: 9.5 }}>Check-pt RMSE cm <span style={{ color: "var(--color-ok)" }}>honest</span></div><div className="m" style={{ fontSize: 14, whiteSpace: "nowrap" }}>{acc.check_rmse_h_m != null ? `${(acc.check_rmse_h_m * 100).toFixed(1)} H · ${((acc.check_rmse_v_m ?? 0) * 100).toFixed(1)} V` : "none"}</div></div>
+              <div><div className="lbl" style={{ fontSize: 9.5 }}>Control RMSE cm <span style={{ color: "var(--color-warn)" }}>optimistic</span></div><div className="m" style={{ fontSize: 14, whiteSpace: "nowrap", color: "var(--color-ink-2)" }}>{acc.gcp_rmse_h_m != null ? `${(acc.gcp_rmse_h_m * 100).toFixed(1)} H · ${((acc.gcp_rmse_v_m ?? 0) * 100).toFixed(1)} V` : "—"}</div></div>
               <div><div className="lbl" style={{ fontSize: 9.5 }}>Scale error</div><div className="m" style={{ fontSize: 16 }}>{acc.scale_error_pct != null ? `${acc.scale_error_pct >= 0 ? "+" : ""}${acc.scale_error_pct.toFixed(2)}%` : "—"}</div></div>
             </div>
           </div>

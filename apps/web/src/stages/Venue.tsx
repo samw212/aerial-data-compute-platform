@@ -21,6 +21,16 @@ export function VenuePage() {
     type: "FeatureCollection",
     features: v ? (facilities.data ?? []).map((f) => ({ type: "Feature", id: f.id, properties: { name: f.name }, geometry: { type: "Polygon", coordinates: [storageRingToLngLat(v.srid, f.boundary)] } })) : [],
   }), [v, facilities.data]);
+  // Labels on their own point source: a polygon label is placed once per tile
+  // the polygon crosses, so "Main pitch" would appear twice at the tile seam.
+  const labels = useMemo<GeoJSON.FeatureCollection>(() => ({
+    type: "FeatureCollection",
+    features: fc.features.map((f) => {
+      const ring = (f.geometry as GeoJSON.Polygon).coordinates[0]!.slice(0, -1);
+      const c = ring.reduce<[number, number]>((a, p) => [a[0] + p[0]! / ring.length, a[1] + p[1]! / ring.length], [0, 0]);
+      return { type: "Feature", id: f.id, properties: f.properties, geometry: { type: "Point", coordinates: c } };
+    }),
+  }), [fc]);
   const center: [number, number] = v ? localToLngLat(v, 0, 0) : [114.17, 22.32];
   const bounds = useMemo(() => (v && facilities.data?.[0] ? storageRingToLngLat(v.srid, facilities.data[0].boundary) : null), [v, facilities.data]);
   const latest = surveys.data?.find((s) => s.status === "complete");
@@ -30,6 +40,8 @@ export function VenuePage() {
         <GeoLayer id="facilities" data={fc} layers={[
           { id: "fac-fill", type: "fill", paint: { "fill-color": "#5ee7ff", "fill-opacity": 0.08 } },
           { id: "fac-line", type: "line", paint: { "line-color": "#5ee7ff", "line-width": 1.5, "line-dasharray": [4, 3] } },
+        ]} />
+        <GeoLayer id="facility-labels" data={labels} layers={[
           { id: "fac-lbl", type: "symbol", layout: { "text-field": ["get", "name"], "text-size": 11.5 }, paint: { "text-color": "#e8ecf1", "text-halo-color": "#0e1116", "text-halo-width": 1.2 } },
         ]} />
       </MapView>

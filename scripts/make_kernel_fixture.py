@@ -83,10 +83,10 @@ def main() -> None:
     scenes = []
 
     # 1. site_alpha at 1 m with the tents: every primitive kind, porosity, mount exclusion.
-    grid = Grid(
-        x_min=site.x_min, x_max=site.x_max, z_min=site.z_min, z_max=site.z_max, spacing=1.0
+    grid = Grid(x_min=site.x_min, x_max=site.x_max, z_min=site.z_min, z_max=site.z_max, spacing=1.0)
+    scenes.append(
+        scene("site_alpha_1m_tents", cams, site_occluders(site) + tent_grid(), grid, None)
     )
-    scenes.append(scene("site_alpha_1m_tents", cams, site_occluders(site) + tent_grid(), grid, None))
 
     # 2. Facility mask on the pitch polygon at 1 m (mask + from_facility snapping).
     pitch = [(-52.5, -34.0), (52.5, -34.0), (52.5, 34.0), (-52.5, 34.0)]
@@ -101,26 +101,47 @@ def main() -> None:
     heights = np.tile(profile, (nz, 1)).astype(np.float32)
     terrain = Terrain(x_min=-10.0, z_min=-20.0, spacing=1.0, heights=heights)
     cam = CameraSpec(
-        id="wide", name="wide", position=Vec3(x=0.0, y=10.0, z=0.0), pan_deg=90.0, tilt_deg=8.0,
-        sensor_w_mm=5.37, sensor_h_mm=4.04, focal_mm=2.8, res_x=3840, res_y=2160,
-        near_m=0.5, far_m=300.0,
+        id="wide",
+        name="wide",
+        position=Vec3(x=0.0, y=10.0, z=0.0),
+        pan_deg=90.0,
+        tilt_deg=8.0,
+        sensor_w_mm=5.37,
+        sensor_h_mm=4.04,
+        focal_mm=2.8,
+        res_x=3840,
+        res_y=2160,
+        near_m=0.5,
+        far_m=300.0,
     )
     occ = [
         Occluder(
             id="wall",
-            prim=ExtrudedPolyline(points=[(30.0, -6.0), (30.0, 6.0)], y0=0.0, y1=4.0, thickness=0.3),
+            prim=ExtrudedPolyline(
+                points=[(30.0, -6.0), (30.0, 6.0)], y0=0.0, y1=4.0, thickness=0.3
+            ),
             owner_id="wall",
             porosity=0.5,
         ),
-        Occluder(id="hut", prim=BoxPrim(cx=12.0, cy=1.5, cz=-8.0, hx=2.0, hy=1.5, hz=1.0, yaw=0.6), owner_id="hut"),
-        Occluder(id="pole", prim=CylinderPrim(cx=6.0, cz=5.0, r=0.3, y0=0.0, y1=9.0), owner_id="pole"),
+        Occluder(
+            id="hut",
+            prim=BoxPrim(cx=12.0, cy=1.5, cz=-8.0, hx=2.0, hy=1.5, hz=1.0, yaw=0.6),
+            owner_id="hut",
+        ),
+        Occluder(
+            id="pole", prim=CylinderPrim(cx=6.0, cz=5.0, r=0.3, y0=0.0, y1=9.0), owner_id="pole"
+        ),
     ]
     grid3 = Grid(x_min=-10.0, x_max=50.0, z_min=-20.0, z_max=20.0, spacing=0.5)
     scenes.append(scene("terrain_ridge_slope", [cam], occ, grid3, terrain))
 
     OUT.parent.mkdir(parents=True, exist_ok=True)
-    OUT.write_text(json.dumps({"kernel_version": KERNEL_VERSION, "scenes": scenes}, separators=(",", ":")))
-    print(f"wrote {OUT.relative_to(REPO)} ({OUT.stat().st_size / 1024:.0f} KB, {len(scenes)} scenes)")
+    OUT.write_text(
+        json.dumps({"kernel_version": KERNEL_VERSION, "scenes": scenes}, separators=(",", ":"))
+    )
+    print(
+        f"wrote {OUT.relative_to(REPO)} ({OUT.stat().st_size / 1024:.0f} KB, {len(scenes)} scenes)"
+    )
 
 
 if __name__ == "__main__":

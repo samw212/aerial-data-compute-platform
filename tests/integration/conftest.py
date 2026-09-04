@@ -36,7 +36,7 @@ def _env(tmp_path_factory: pytest.TempPathFactory) -> None:
 
 
 @pytest.fixture(scope="session")
-def seeded(_env: None) -> dict[str, str]:
+def seeded(_env: None) -> Iterator[dict[str, str]]:
     """A fresh schema with site_alpha loaded, once per session."""
     from groma_api.db.base import SessionLocal, get_engine
     from groma_api.seed import reset_schema, seed
@@ -46,7 +46,7 @@ def seeded(_env: None) -> dict[str, str]:
     db = SessionLocal()()
     try:
         reset_schema(db)
-        return seed(
+        yield seed(
             db,
             REPO / "fixtures" / "sites" / "site_alpha.json",
             "admin@test.local",
@@ -54,6 +54,8 @@ def seeded(_env: None) -> dict[str, str]:
         )
     finally:
         db.close()
+        # Return the pooled connections before the interpreter tears the pool down.
+        get_engine().dispose()
 
 
 @pytest.fixture(scope="session")

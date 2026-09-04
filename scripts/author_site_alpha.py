@@ -34,6 +34,11 @@ REPO_ROOT = Path(__file__).resolve().parent.parent
 FIXTURE = REPO_ROOT / "fixtures" / "sites" / "site_alpha.json"
 
 # Site extent, local ENU metres, centred on the pitch.
+#
+# The compute frame is Y-up and right-handed with X east, so north is -Z (pan 0
+# points along -Z, and geo.ts maps N = origin_y - z). "South" structures therefore
+# carry positive z. Getting this backwards puts the stand on the wrong touchline
+# and the "south-west" camera in the north-west on every map.
 HALF_W = 66.0
 HALF_D = 41.0
 
@@ -54,14 +59,14 @@ FENCE_HALF_Z = 40.5
 # midfield masts are floodlighting only, and exist so that extraction has to
 # separate six cylinders rather than four.
 CORNER_MASTS = [
-    ("mast_sw", -57.0, -37.0),
-    ("mast_se", 57.0, -37.0),
-    ("mast_ne", 57.0, 37.0),
-    ("mast_nw", -57.0, 37.0),
+    ("mast_sw", -57.0, 37.0),
+    ("mast_se", 57.0, 37.0),
+    ("mast_ne", 57.0, -37.0),
+    ("mast_nw", -57.0, -37.0),
 ]
 MIDFIELD_MASTS = [
-    ("mast_mid_s", 0.0, -38.0),
-    ("mast_mid_n", 0.0, 38.0),
+    ("mast_mid_s", 0.0, 38.0),
+    ("mast_mid_n", 0.0, -38.0),
 ]
 
 
@@ -115,10 +120,10 @@ def build() -> dict[str, object]:
     # collinear clusters into runs like these (build spec 12.3), so the authored
     # truth has to be four, not forty.
     corners = {
-        "fence_s": [(-FENCE_HALF_X, -FENCE_HALF_Z), (FENCE_HALF_X, -FENCE_HALF_Z)],
-        "fence_e": [(FENCE_HALF_X, -FENCE_HALF_Z), (FENCE_HALF_X, FENCE_HALF_Z)],
-        "fence_n": [(FENCE_HALF_X, FENCE_HALF_Z), (-FENCE_HALF_X, FENCE_HALF_Z)],
-        "fence_w": [(-FENCE_HALF_X, FENCE_HALF_Z), (-FENCE_HALF_X, -FENCE_HALF_Z)],
+        "fence_s": [(-FENCE_HALF_X, FENCE_HALF_Z), (FENCE_HALF_X, FENCE_HALF_Z)],
+        "fence_e": [(FENCE_HALF_X, FENCE_HALF_Z), (FENCE_HALF_X, -FENCE_HALF_Z)],
+        "fence_n": [(FENCE_HALF_X, -FENCE_HALF_Z), (-FENCE_HALF_X, -FENCE_HALF_Z)],
+        "fence_w": [(-FENCE_HALF_X, -FENCE_HALF_Z), (-FENCE_HALF_X, FENCE_HALF_Z)],
     }
     for name, points in corners.items():
         structures.append(
@@ -132,12 +137,12 @@ def build() -> dict[str, object]:
             }
         )
 
-    # Spectator stand, 44 x 6 x 6, along the south touchline and clear of it.
+    # Spectator stand, 44 x 6 x 6, along the south touchline (+Z) and clear of it.
     structures.append(
         {
             "name": "stand_south",
             "cls": "stand",
-            "primitive": box(cx=0.0, cy=3.0, cz=-37.0, hx=22.0, hy=3.0, hz=3.0),
+            "primitive": box(cx=0.0, cy=3.0, cz=37.0, hx=22.0, hy=3.0, hz=3.0),
             "porosity": 0.0,
             "mountable": True,
             "seasonal": False,
@@ -158,9 +163,10 @@ def build() -> dict[str, object]:
         }
     )
 
-    # Two trees, 6.4 x 6.4 x 8, flagged seasonal: a February survey and a July
-    # report describe different sites, so coverage is computed both ways.
-    for name, x, z in (("tree_east", 44.0, 37.3), ("tree_west", -20.0, 37.3)):
+    # Two trees, 6.4 x 6.4 x 8, on the north margin (-Z), flagged seasonal: a
+    # February survey and a July report describe different sites, so coverage is
+    # computed both ways.
+    for name, x, z in (("tree_east", 44.0, -37.3), ("tree_west", -20.0, -37.3)):
         structures.append(
             {
                 "name": name,

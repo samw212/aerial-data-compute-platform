@@ -1,167 +1,113 @@
 # Status
 
 What is built, what is stubbed, and where the next session starts.
+Last verified 2026-09-04 (all suites green locally and on the instance).
 
 ## Milestones
 
 | | Milestone | State |
 | --- | --- | --- |
 | M0 | Skeleton | **Done.** Layout, uv workspace, docker-compose, Makefile, ruff/mypy/pytest, CI, contracts complete (§4), TS generation. |
-| M1 | Coverage kernel | **Done.** `geo/optics.py`, `coverage/*` including terrain and `reference.py`. T1–T14 pass; benchmark 505 ms against an 800 ms budget. |
-| M2 | Synthetic ground truth | **Next.** `fixtures/sites/site_alpha.json` is authored and committed; `scripts/synthesise_site.py` and `scripts/render_survey.py` are not written. |
-| M3–M15 | | Not started. Package skeletons exist so the layout and the import graph are enforced from the start. |
+| M1 | Coverage kernel | **Done.** `geo/optics.py`, `coverage/*` including terrain and `reference.py`. T1–T16 pass; benchmark 166 ms against an 800 ms budget. |
+| M3 | Web app | **Done for Phase 1.** Viewport-first workbench (`apps/web`): Portfolio, Venue, Capture, Process, Model (Plan / 3D / Review), Plan (live browser kernel, camera drag, run on server), Report (persisted runs, A/B compare), Jobs, Admin. MapLibre on Lands Department tiles; TypeScript kernel with a parity fixture generated from the Python kernel. Playwright e2e and a visual sweep over every stage. |
+| M4 | API and database | **Done.** PostGIS schema (`apps/api/groma_api/db/models.py`, Alembic `0001_initial`), auth and roles, the build-spec 7 API for orgs, venues, facilities, surveys, structures, mount points, scenarios, coverage runs, measurements; seed; 15 integration tests against real PostGIS. |
+| M5 | Jobs and reporting | **Partial.** `apps/worker` pops jobs from Redis, sweeps the job table, streams progress and console lines over `/ws/jobs/{id}`; fine coverage grids are the one job kind. PDF report and scenario clone are not written (the Report stage's Export PDF is disabled). |
+| M15 | Deployment | **Done for Phase 1.** `deploy/autodl/bootstrap.sh` installs PostgreSQL 14 + PostGIS, Redis, nginx, Node 20, the uv env, builds the SPA, migrates, runs every suite, starts five supervisord programs, seeds, installs the nightly backup. `groma-ctl` covers status/health/logs/update/smoke/backup/restore/users/disk/gpu. `docs/OPERATOR-GUIDE.md` is the operator's guide. |
+| M2 | Synthetic ground truth | **Next.** `fixtures/sites/site_alpha.json` is authored; `scripts/synthesise_site.py` and `scripts/render_survey.py` are not written. |
+| M6–M14, M16 | | Not started. Package skeletons (`capture`, `recon`, `segment`, `tiles`) exist so the import graph is enforced from the start. The ODM Pixi install spike is running on the instance (`/root/autodl-tmp/groma/logs/odm-spike.log`). |
 
-### M0 completion criteria (§17)
+The build order follows `docs/PLAN.md`: Phase 1 (M3, M4, M5, deploy) is what is
+here. Phase 2 is M2 + M6.
 
-- `make test` and `make lint` clean — yes. 179 tests, 3.2 s; ruff and mypy `strict` clean over 30 source files.
-- Contracts importable from every package — yes, asserted by `test_every_package_can_import_contracts`.
-- T14 passes — yes.
+## What the suites cover
 
-### M1 completion criteria (§17)
+| Command | What | Count |
+| --- | --- | --- |
+| `make test` | kernel analytic cases T1–T16, contracts, golden, TS generation, parity fixture | 188 in ~1.3 s |
+| `make test-integration` | the API against real PostGIS: auth, roles, the 409 gates, immutability, pagination, terrain drop | 15 |
+| `make test-web` | TypeScript kernel parity against the Python kernel on three scenes | 7 |
+| `make test-e2e` | Playwright: sign-in, portfolio, review by keyboard, live coverage vs the golden, run on server, report, 3D | 4 + a visual sweep of 19 screens with console errors and failed requests asserted empty |
+| `make kernel-bench` | 173k cells × 6 cameras × terrain | 166 ms |
 
-- T1–T14 pass — yes, with the T13 qualification below.
-- 173k cells × 6 cameras × terrain under 800 ms — yes, 505 ms best of three.
-- Golden fixture within ±0.3 pp — yes against the committed golden; see below.
+## Where things run
 
-## Specification discrepancies
+- **The AutoDL instance** (`AUTODL.md` has the login line; it changes on every
+  restart). nginx on port 6006 serves the SPA and proxies `/api` and `/ws`.
+  `groma-ctl status | health | smoke`. The app directory is a git clone of `main`,
+  so `groma-ctl update` works.
+- **Locally**: `make dev`, `make api`, `make web`, `make seed`. Playwright expects
+  the Vite dev server on 5173 and the admin password `local-dev-password`
+  (`groma seed --reset --admin-password local-dev-password`).
 
-Three places where the supplied documents contradict themselves or are silent. Each
-was resolved deliberately rather than by picking whichever reading made a test pass.
+## Decisions and corrections worth knowing about
 
-### 1. Porosity is the attenuation factor, not its complement
+### The fixture's compass, corrected 2026-09-04
 
-§6.4 step 5 says to accumulate transmission as `∏(1 − porosity)`. Every other
-statement of the field says the opposite: §6.1, §4.4 and the extraction defaults in
-§12.3 all define **0 = solid, 1 = fully transparent**, with a mesh fence at 0.85 and
-a solid wall at 0. Under `1 − porosity` a solid wall would transmit fully, a "fully
-transparent" fence would be opaque, and explained §7.8's chain-link — described as
-"nearly transparent" — would cut the pixel density behind it to 15%.
+The compute frame is Y-up and right-handed with X east, so **north is −Z**: pan 0°
+points along −Z and `apps/web/src/geo.ts` maps N = origin_y − z. The first
+authoring of `site_alpha` placed its "south" structures at negative z, which put the
+stand on the north touchline and the "south-west" camera in the north-west on every
+map. `scripts/author_site_alpha.py` now mirrors z; names, inventory and camera pans
+(derived by `pan_towards`) are unchanged.
 
-The kernel uses `porosity` itself as the factor: 0 blocks, 1 has no effect, 0.5
-halves. T12 pins only the 0.5 case and passes either way, so the tests could not
-settle it. `test_fully_transparent_occluder_has_no_effect` pins the case that does.
+The T13 golden moved by less than 0.1 pp (detect 92.24 → 92.32 %, blind 7.75 →
+7.66 %) because `Grid.centres()` samples at `x_min + i·h`, the cell's corner rather
+than its centre, so a mirror of the site is not a mirror of the sample points. That
+is the sampling rule the spec describes (§6.1, "column 0 is x_min") and the kernel
+is unchanged (`KERNEL_VERSION` 1.1.0); the golden and the parity fixture were
+regenerated together and the movement is recorded here rather than absorbed.
 
-### 2. The T13 reference table belongs to a fixture that was not supplied
+### Map rendering rules learned the hard way
 
-§6.6 quotes recognise 5.2%, observe 38.6%, detect 91.7%, blind 8.3%, seen-by-2+
-51.3% for `site_alpha`, and says never to widen the tolerance. Those figures
-describe the original authored `fixtures/sites/site_alpha.json`, which was not among
-the supplied files. It has been re-authored here from the inventory in explained
-§4.1 (6 masts, 4 fence runs, a stand, a pavilion, 2 seasonal trees) and the 132 × 82 m
-extent implied by the §6.4 performance target, with positions chosen to satisfy the
-obvious constraints — see `scripts/author_site_alpha.py`, which validates them.
+- `line-dasharray` cannot be data-driven in MapLibre; a layer that tries is
+  rejected silently and everything in it vanishes. Rejected structures get their own
+  dashed layer.
+- The default glyph stack (`Open Sans Regular,Arial Unicode MS Regular`) makes the
+  OpenMapTiles font server answer with an HTML page, which the PBF parser rejects,
+  and every label disappears. `GeoLayer` pins `text-font` to `Open Sans Regular`.
+- Polygon labels are placed once per tile the polygon crosses; labels go on a
+  centroid point source.
+- The map follows a `center` prop until a `bounds` fit takes over, because every
+  stage computes its centre from data that arrives after the map is built; and a
+  `ResizeObserver` calls `map.resize()` because the dock and strip resize the
+  container without a window event.
 
-It is therefore a different site, and cannot be held to another site's numbers.
-What it produces:
+### Earlier decisions (M0/M1)
 
-| Metric | Spec §6.6 | This fixture | Gap |
-| --- | --- | --- | --- |
-| Recognise or better | 5.2% | 5.67% | 0.47 pp |
-| Observe or better | 38.6% | 37.86% | 0.74 pp |
-| Detect or better | 91.7% | 92.24% | 0.54 pp |
-| Blind | 8.3% | 7.75% | 0.55 pp |
-| Seen by 2+ cameras | 51.3% | 49.00% | 2.30 pp |
-| Blind with the 3×4 tent grid | 21.2% | 19.42% | 1.78 pp |
-| Newly blind under tents | ~1,400 m² | 1,263 m² | ~137 m² |
+- **Porosity is the attenuation factor, not its complement.** §6.4 step 5 says
+  `∏(1 − porosity)`; every other statement of the field (§6.1, §4.4, §12.3) defines
+  0 = solid, 1 = transparent. The kernel uses `porosity` itself as the factor.
+- **The T13 reference table belongs to a fixture that was not supplied.** The
+  fixture here is re-authored from explained §4.1; the acceptance criterion is
+  regression against the committed golden at ±0.3 pp, and a corroboration test
+  records the distance from the spec's table at ±2.5 pp.
+- **`docs/design.md` was not supplied**; see `docs/README.md`.
+- **Grid cell count** is `extent / spacing` (528 × 328 for 132 × 82 m at 0.25 m).
+- **Roll is refused, not ignored**; **terrain march step is in metres**;
+  **`blind_polygons` traces cell boundaries**; **optional dependencies are
+  per-milestone extras.**
 
-Landing within a percentage point on four of five statistics, from an independently
-re-authored site, is corroboration that the kernel is right — a pan sign error or a
-broadcasting bug would not produce numbers this close.
+## Deployment notes
 
-T13 is therefore split in two, in `tests/golden/test_site_alpha.py`:
-
-- The **acceptance criterion** is regression against the committed golden
-  `tests/golden/site_alpha_coverage.json` at the specified ±0.3 pp. This is what
-  fails when kernel behaviour moves.
-- A **corroboration test** records the distance from the spec's table at ±2.5 pp,
-  set just past the largest observed gap.
-
-**When the original `site_alpha.json` arrives:** drop it in, run `make golden`,
-tighten the corroboration test to ±0.3 pp or delete it, and confirm the spec's five
-figures directly.
-
-### 3. `docs/design.md` was not supplied
-
-Both documents reference it as one of three companions. Nothing in M0 or M1 needed
-it. See `docs/README.md`.
-
-## Decisions worth knowing about
-
-- **Grid cell count.** §6.1 says "column 0 is `x_min`"; §6.4 quotes 173,184 cells for
-  132 × 82 m at 0.25 m, which is 528 × 328 — `extent / spacing`, not `+ 1`. `Grid`
-  follows the cell count, so the area works out to exactly 10,824 m².
-- **Roll is refused, not ignored.** `CameraSpec.roll_deg` is carried through, but a
-  non-zero value raises `NotImplementedError` in the kernel rather than being
-  silently dropped: the frustum test cannot honour it, and quietly ignoring it would
-  give wrong results at the frustum edges that nothing in the suite would catch.
-- **Terrain march step is defined in metres**, not as a step count, so a ray's sample
-  positions depend only on its own length. A grid-wide step count would put the fast
-  kernel's samples and `reference.py`'s in different places and fail T5 on sloped
-  terrain for a reason that is not a bug in either.
-- **`blind_polygons` traces cell boundaries** rather than interpolating a marching-
-  squares contour: blind cells are a discrete set, and an interpolated iso-contour
-  would imply sub-cell precision the grid does not have. Areas quoted in reports come
-  from the cell count, never from the polygon.
-- **Optional dependencies are per-milestone.** The M2–M15 package skeletons declare
-  their heavy dependencies (OpenCV, laspy, Open3D, rasterio) in extras named for their
-  milestone, so the workspace installs and the kernel suite runs with no GDAL, no PDAL
-  and no CUDA.
-
-## Deployment (ahead of M15, deliberately small)
-
-`deploy/autodl/` holds a one-command installer for an AutoDL instance and the
-`groma-ctl` management command; `docs/runbook-autodl.md` is the operator's guide,
-written for someone with no server background. What is deployed is `apps/api`, a
-stateless FastAPI service over the M1 kernel: health, kernel version, coverage
-statistics and a DORI heatmap, plus an index page. It binds AutoDL's exposed port
-6006 directly rather than sitting behind nginx, because until the M3 frontend
-exists there is nothing for nginx to serve. The build-spec 7 API replaces these
-routes when M4 lands; only the heatmap encoder is meant to survive.
-
-This sandbox cannot open SSH connections (its egress is HTTPS on port 443 only), so
-the deployment was **not executed against the target instance from here**. The
-installer was exercised end to end on a local clone instead — install, tests,
-supervisord, health check, and every `groma-ctl` verb — and the runbook tells the
-operator how to run it.
-
-The GitHub repository is **private**, which blocks anonymous downloads on the
-instance. The installer accepts a read-only token (`GROMA_GITHUB_TOKEN`) and stores
-it in a root-only credential file so that later `groma-ctl update` runs need
-nothing; the runbook's section 4 walks a non-technical operator through creating
-one, and offers making the repository public as the simpler alternative.
-
-## Three performance defects found and fixed in M1
-
-The benchmark first came in at 12.4 s against the 800 ms budget. Both causes were
-real:
-
-1. `Terrain.height_at` called `astype(np.float64)` on the whole heightfield on every
-   invocation — once per march step, per ray. The promoted copy is now made once, in
-   `__post_init__`.
-2. The terrain march ran even when the ray could not reach the ground. A segment is a
-   straight line, so its lowest point is at one end; a ray that stays above the
-   highest point in the heightfield cannot be blocked by any of it. On flat terrain
-   this rejects every ray. Exact, not an approximation.
-
-That reached 777 ms — a pass, but with 3% headroom, which would flake on any slower
-machine. Hoisting the camera-to-target segment geometry out of the per-occluder
-broad phase (`SegmentBatch`) took it to **505 ms**.
-
-3. The review pass then measured the benchmark on a 3% slope instead of flat
-   ground: **6.6 s**. The "highest point in the heightfield" rejection is useless
-   on a slope, because the top of the slope is the maximum, and every real DTM has
-   some slope. The march is now coarse-to-fine: a max-pooled, dilated copy of the
-   heightfield (`Terrain.coarse_max_at`) lets a stretch of ray be cleared exactly
-   with one lookup per sixteen cells, and only rays that fail that go to the fine
-   march. Sloped terrain: **6.6 s → 0.6 s.** Still exact — T5, T10, T11 and a new
-   parity test on seeded random terrain with a ridge all agree with `reference.py`
-   cell for cell.
+- `groma-ctl start postgres redis` used to abort `bootstrap.sh`: supervisorctl's
+  status listing exits 3 whenever any program is stopped, and the installer runs
+  under `set -e`. Two installs died at that line before it was found.
+- `groma-ctl smoke` used an f-string with a backslash, which Python 3.10 (the
+  instance's system interpreter) rejects. `backup-install` failed under `pipefail`
+  on an empty crontab, and the `cron` package was not in the apt list.
+- pytest already has `-q` in `pyproject.toml`; passing it again suppressed the
+  "N passed" line the installer greps for.
 
 ## Where the next session starts
 
-M2, `docs/build-spec.md` §16. `scripts/synthesise_site.py` reads the committed
-`fixtures/sites/site_alpha.json` and writes a point cloud, DSM/DTM, ortho with
-regulation pitch markings, and `truth.json`. `scripts/render_survey.py` renders the
-simulated flight and `poses_truth.json`.
+Phase 2 of `docs/PLAN.md`: M2, `docs/build-spec.md` §16. `scripts/synthesise_site.py`
+reads the committed `fixtures/sites/site_alpha.json` and writes a point cloud,
+DSM/DTM, ortho with regulation pitch markings, and `truth.json`;
+`scripts/render_survey.py` renders the simulated flight and `poses_truth.json`.
+Then M6 capture ingest, which makes the Capture stage live.
+
+Also outstanding from Phase 1: the PDF report and scenario clone (M5), and the
+ODM spike report (`docs/engine-spike.md`) once the Pixi install on the instance
+finishes.
 
 `make test` at the start and end of the session.

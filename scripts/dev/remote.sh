@@ -20,7 +20,7 @@ HERE="$(cd "$(dirname "$0")/../.." && pwd)"
 PYPI_MIRROR="${ADCP_PYPI_MIRROR:-https://mirrors.aliyun.com/pypi/packages/}"
 
 sync() {
-  rsync -az --delete \
+  rsync -rlptz --no-owner --no-group --delete \
     --exclude '.git/' --exclude '.venv/' --exclude 'node_modules/' \
     --exclude '__pycache__/' --exclude '.pytest_cache/' --exclude '.mypy_cache/' \
     --exclude '.ruff_cache/' --exclude 'apps/web/dist/' --exclude 'AUTODL.md' \

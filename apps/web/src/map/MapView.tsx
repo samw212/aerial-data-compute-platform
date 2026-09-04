@@ -34,7 +34,9 @@ function alive(map: MLMap | null): map is MLMap {
 const MapCtx = createContext<MLMap | null>(null);
 export const useMap = () => useContext(MapCtx);
 
-export function MapView({ center, zoom = 17, bounds, children, onClick, onMouseMove }: { center: [number, number]; zoom?: number; bounds?: [number, number][] | null; children?: ReactNode; onClick?: (lngLat: [number, number], e: maplibregl.MapMouseEvent) => void; onMouseMove?: (lngLat: [number, number]) => void }) {
+const FIT_PADDING = { top: 90, bottom: 60, left: 70, right: 430 };
+
+export function MapView({ center, zoom = 17, bounds, padding, children, onClick, onMouseMove }: { center: [number, number]; zoom?: number; bounds?: [number, number][] | null; padding?: Partial<typeof FIT_PADDING>; children?: ReactNode; onClick?: (lngLat: [number, number], e: maplibregl.MapMouseEvent) => void; onMouseMove?: (lngLat: [number, number]) => void }) {
   const el = useRef<HTMLDivElement>(null);
   const [map, setMap] = useState<MLMap | null>(null);
   const layers = useUi((s) => s.layers);
@@ -45,7 +47,11 @@ export function MapView({ center, zoom = 17, bounds, children, onClick, onMouseM
     m.touchZoomRotate.disableRotation();
     (window as unknown as { __adcpMap?: MLMap }).__adcpMap = m; // for e2e assertions
     m.on("load", () => setMap(m));
-    return () => { setMap(null); m.remove(); };
+    // MapLibre only watches the window; the dock, strip and 3D toggle resize the
+    // container without a window event, which otherwise leaves the canvas stale.
+    const ro = new ResizeObserver(() => m.resize());
+    ro.observe(el.current);
+    return () => { ro.disconnect(); setMap(null); m.remove(); };
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
@@ -54,9 +60,20 @@ export function MapView({ center, zoom = 17, bounds, children, onClick, onMouseM
   useEffect(() => {
     if (!map || !bounds || !bounds.length || fitted.current) return;
     const lngs = bounds.map((p) => p[0]), lats = bounds.map((p) => p[1]);
-    map.fitBounds([[Math.min(...lngs), Math.min(...lats)], [Math.max(...lngs), Math.max(...lats)]], { padding: { top: 90, bottom: 60, left: 70, right: 430 }, duration: 0 });
+    map.fitBounds([[Math.min(...lngs), Math.min(...lats)], [Math.max(...lngs), Math.max(...lats)]], { padding: { ...FIT_PADDING, ...padding }, duration: 0 });
     fitted.current = true;
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [map, bounds]);
+
+  // The stages compute `center` from data that arrives after the map is built
+  // (the venue, the portfolio). Follow it until a bounds fit has taken over.
+  const [cLng, cLat] = center;
+  useEffect(() => {
+    if (!map || fitted.current) return;
+    const cur = map.getCenter();
+    if (Math.abs(cur.lng - cLng) < 1e-7 && Math.abs(cur.lat - cLat) < 1e-7) return;
+    map.jumpTo({ center: [cLng, cLat], zoom });
+  }, [map, cLng, cLat, zoom]);
 
   useEffect(() => {
     if (!map) return;
@@ -86,15 +103,22 @@ export function MapView({ center, zoom = 17, bounds, children, onClick, onMouseM
   );
 }
 
+/** Omit that distributes over a union, so per-type keys such as `filter` survive. */
+type LayerSansSource = maplibregl.LayerSpecification extends infer L ? (L extends unknown ? Omit<L, "source"> : never) : never;
+
 /** A GeoJSON source + one or more layers, kept in sync with `data`. */
-export function GeoLayer({ id, data, layers, visible = true, before }: { id: string; data: GeoJSON.FeatureCollection; layers: Omit<maplibregl.LayerSpecification, "source">[]; visible?: boolean; before?: string }) {
+export function GeoLayer({ id, data, layers, visible = true, before }: { id: string; data: GeoJSON.FeatureCollection; layers: LayerSansSource[]; visible?: boolean; before?: string }) {
   const map = useMap();
   useEffect(() => {
     if (!map) return;
     if (!map.getSource(id)) map.addSource(id, { type: "geojson", data });
     else (map.getSource(id) as maplibregl.GeoJSONSource).setData(data);
     for (const l of layers) {
-      if (!map.getLayer(l.id)) map.addLayer({ ...(l as maplibregl.LayerSpecification), source: id } as maplibregl.LayerSpecification, before && map.getLayer(before) ? before : undefined);
+      // MapLibre's default stack is "Open Sans Regular,Arial Unicode MS Regular"; the
+      // glyph server answers that composite name with an HTML page, which the PBF
+      // parser rejects ("Unimplemented type: 4") and every label silently vanishes.
+      const spec = l.type === "symbol" ? { ...l, layout: { "text-font": ["Open Sans Regular"], ...l.layout } } : l;
+      if (!map.getLayer(l.id)) map.addLayer({ ...(spec as maplibregl.LayerSpecification), source: id } as maplibregl.LayerSpecification, before && map.getLayer(before) ? before : undefined);
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [map, id, data]);

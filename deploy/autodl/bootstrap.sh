@@ -56,7 +56,7 @@ ok "disk: $(df -h "$GROMA_HOME" | awk 'NR==2{print $4" free of "$2}')"
 say "Installing system packages (PostgreSQL 14 + PostGIS, Redis, nginx, Node 20, GDAL, PDAL, exiftool, ffmpeg)"
 export DEBIAN_FRONTEND=noninteractive
 need=""
-for p in postgresql-14 postgresql-14-postgis-3 postgresql-client-14 redis-server nginx libimage-exiftool-perl ffmpeg gdal-bin pdal libgl1 rsync ca-certificates gnupg; do
+for p in postgresql-14 postgresql-14-postgis-3 postgresql-client-14 redis-server nginx cron libimage-exiftool-perl ffmpeg gdal-bin pdal libgl1 rsync ca-certificates gnupg; do
   dpkg -s "$p" >/dev/null 2>&1 || need="$need $p"
 done
 if [ -n "$need" ]; then
@@ -193,7 +193,7 @@ ok "schema at head"
 if [ "${GROMA_SKIP_TESTS:-0}" != "1" ]; then
   say "Running the test suite (this is how you know the install is good)"
   if GROMA_ENV_FILE=/etc/groma.env GROMA_TEST_DATABASE_URL="postgresql+psycopg://groma:${DBPASS}@127.0.0.1:5432/groma_test" \
-     uv run pytest tests/unit tests/golden tests/integration -m "not slow and not bench" -q >"$LOGS/tests.log" 2>&1; then
+     uv run pytest tests/unit tests/golden tests/integration -m "not slow and not bench" >"$LOGS/tests.log" 2>&1; then
     ok "$(grep -E 'passed' "$LOGS/tests.log" | tail -1)"
   else
     tail -30 "$LOGS/tests.log" >&2; fail "tests failed; the services were not started. Full output: $LOGS/tests.log"

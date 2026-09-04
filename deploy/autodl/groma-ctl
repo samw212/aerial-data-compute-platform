@@ -50,7 +50,9 @@ cmd_start() {
       for p in $PROGRAMS; do case " $* " in *" $p "*) ;; *) svc stop "groma:$p" >/dev/null 2>&1 || true ;; esac; done
     fi
   fi
-  cmd_status
+  # supervisorctl status exits 3 when any program is stopped, which is expected
+  # when only some programs were asked for; the listing is informational here.
+  cmd_status || true
 }
 cmd_stop() {
   if ! supervisor_running; then echo "already stopped"; return; fi
@@ -59,7 +61,7 @@ cmd_stop() {
 cmd_restart() {
   if ! supervisor_running; then cmd_start "$@"; return; fi
   # shellcheck disable=SC2046
-  svc restart $(progs "$@"); sleep 2; cmd_status
+  svc restart $(progs "$@"); sleep 2; cmd_status || true
 }
 cmd_status() {
   if supervisor_running; then svc status 'groma:*'; else red "not running (supervisord is not up). Start it with: groma-ctl start"; return 1; fi
@@ -80,7 +82,7 @@ cmd_test() {
   cd "$APP"
   # shellcheck disable=SC1091
   set -a; . /etc/groma.env; set +a
-  GROMA_TEST_DATABASE_URL="${GROMA_DATABASE_URL/\/groma/\/groma_test}" uv run pytest tests/unit tests/golden tests/integration -m "not slow and not bench" -q
+  GROMA_TEST_DATABASE_URL="${GROMA_DATABASE_URL/\/groma/\/groma_test}" uv run pytest tests/unit tests/golden tests/integration -m "not slow and not bench"
 }
 cmd_update() {
   cd "$APP"
@@ -113,7 +115,7 @@ import sys,json; vs=json.load(sys.stdin); print(vs[0]["venue"]["id"] if vs else 
   scen=$(curl -fsS -b "$jar" "$base/api/venues/$scen/scenarios" | python3 -c 'import sys,json; s=json.load(sys.stdin); print(s[0]["id"] if s else "")')
   [ -n "$scen" ] || { green "smoke ok (no scenario yet)"; rm -f "$jar"; return 0; }
   curl -fsS -b "$jar" -H 'Content-Type: application/json' -d '{"grid_spacing_m":1.0}' "$base/api/scenarios/$scen/coverage" \
-    | python3 -c 'import sys,json; r=json.load(sys.stdin); s=r["stats"]; print(f"smoke ok: coverage run {r[\"id\"][:8]} kernel {r[\"kernel_version\"]} detect {100*s[\"tier_area_m2\"][\"detect\"]/s[\"area_m2\"]:.1f}% in {r[\"duration_ms\"]} ms")'
+    | python3 -c 'import sys,json; r=json.load(sys.stdin); s=r["stats"]; print("smoke ok: coverage run %s kernel %s detect %.1f%% in %s ms" % (r["id"][:8], r["kernel_version"], 100*s["tier_area_m2"]["detect"]/s["area_m2"], r["duration_ms"]))'
   rm -f "$jar"
 }
 cmd_backup() {
@@ -132,7 +134,9 @@ cmd_restore() {
   cmd_start api worker; green "restored from $f"
 }
 cmd_backup_install() {
-  ( crontab -l 2>/dev/null | grep -v 'groma-ctl backup'; echo "30 3 * * * /usr/local/bin/groma-ctl backup >> $LOGS/backup.log 2>&1" ) | crontab -
+  command -v crontab >/dev/null || { red "cron is not installed (apt-get install cron), so the nightly backup cannot be scheduled"; return 1; }
+  # grep exits 1 on an empty crontab; under pipefail that would abort the install.
+  ( crontab -l 2>/dev/null | grep -v 'groma-ctl backup' || true; echo "30 3 * * * /usr/local/bin/groma-ctl backup >> $LOGS/backup.log 2>&1" ) | crontab -
   pgrep -x cron >/dev/null || (cron 2>/dev/null || service cron start >/dev/null 2>&1 || true)
   green "nightly backup at 03:30 installed (crontab -l to see it)"
 }
