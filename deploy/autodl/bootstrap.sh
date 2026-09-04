@@ -111,6 +111,18 @@ ok "environment ready in $APP/.venv"
 
 # ------------------------------------------------------------------- web build
 say "Building the web app"
+# Remove stray compiled output from the source tree before building.
+#
+# A `tsc` run without this project's tsconfig (which sets noEmit) drops a .js file
+# beside every .tsx. Those files are untracked, so `git checkout` during an update
+# never removes them, and Vite resolves ./stages/Portfolio to the stale Portfolio.js
+# in preference to Portfolio.tsx. The build then succeeds, the bundle is rebuilt with
+# a fresh timestamp, and it contains the old application. This was found after a
+# frontend change deployed cleanly and did not appear in the browser.
+# `git clean -fd` removes exactly the untracked strays: it will not touch a tracked
+# file such as vite-env.d.ts, and without -x it leaves the generated, gitignored
+# api/contracts.ts alone.
+git -C "$APP" clean -qfd apps/web/src || true
 # apps/web/src/api/contracts.ts is generated from packages/contracts and gitignored.
 uv run python scripts/generate_ts_types.py apps/web/src/api/contracts.ts >/dev/null
 cd "$APP/apps/web"
