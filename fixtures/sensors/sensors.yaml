@@ -1,0 +1,118 @@
+# Physical sensor dimensions, keyed by EXIF Make and Model. Build spec 8.2.
+#
+# EXIF gives focal length in millimetres and never gives sensor dimensions, but
+# px/m depends on both. Every entry here is a published manufacturer figure; where
+# a model is absent the ingest falls back to sensor_w_mm = 36 * focal / focal35
+# and records `sensor_estimated` in capture_qa.warnings, because an estimated
+# sensor size propagates straight into GSD and into every px/m in the report.
+#
+# `model` is matched case-insensitively after stripping whitespace. Several DJI
+# aircraft report only the camera board name (FC6310, L1D-20c), which is why the
+# board names appear as their own entries rather than as aliases of the aircraft.
+
+sensors:
+  # --- 1-inch class ------------------------------------------------------------
+  - make: DJI
+    model: FC6310            # Phantom 4 Pro / Pro V2.0
+    sensor_w_mm: 13.2
+    sensor_h_mm: 8.8
+    res_x: 5472
+    res_y: 3648
+  - make: DJI
+    model: FC6310R           # Phantom 4 RTK
+    sensor_w_mm: 13.2
+    sensor_h_mm: 8.8
+    res_x: 5472
+    res_y: 3648
+  - make: DJI
+    model: L1D-20c           # Mavic 2 Pro, Hasselblad
+    sensor_w_mm: 13.2
+    sensor_h_mm: 8.8
+    res_x: 5472
+    res_y: 3648
+  - make: DJI
+    model: FC3411            # Air 2S
+    sensor_w_mm: 13.2
+    sensor_h_mm: 8.8
+    res_x: 5472
+    res_y: 3648
+
+  # --- Four Thirds -------------------------------------------------------------
+  - make: DJI
+    model: M3E               # Mavic 3 Enterprise, wide
+    sensor_w_mm: 17.3
+    sensor_h_mm: 13.0
+    res_x: 5280
+    res_y: 3956
+  - make: DJI
+    model: FC4170            # Mavic 3 / 3 Classic, Hasselblad
+    sensor_w_mm: 17.3
+    sensor_h_mm: 13.0
+    res_x: 5280
+    res_y: 3956
+
+  # --- Full frame --------------------------------------------------------------
+  - make: DJI
+    model: ZenmuseP1         # Matrice 300 RTK survey payload
+    sensor_w_mm: 35.9
+    sensor_h_mm: 24.0
+    res_x: 8192
+    res_y: 5460
+
+  # --- 1/2 and 1/2.3 inch class -----------------------------------------------
+  - make: DJI
+    model: FC3170            # Mavic Air 2
+    sensor_w_mm: 6.4
+    sensor_h_mm: 4.8
+    res_x: 8000
+    res_y: 6000
+  - make: DJI
+    model: FC330             # Phantom 4 / Phantom 3 Advanced
+    sensor_w_mm: 6.17
+    sensor_h_mm: 4.55
+    res_x: 4000
+    res_y: 3000
+  - make: DJI
+    model: FC300X            # Phantom 3 Professional
+    sensor_w_mm: 6.17
+    sensor_h_mm: 4.55
+    res_x: 4000
+    res_y: 3000
+  - make: DJI
+    model: FC7303            # Mini 2
+    sensor_w_mm: 6.17
+    sensor_h_mm: 4.55
+    res_x: 4000
+    res_y: 3000
+  - make: DJI
+    model: FC220             # Mavic Pro
+    sensor_w_mm: 6.17
+    sensor_h_mm: 4.55
+    res_x: 4000
+    res_y: 3000
+  - make: DJI
+    model: FC2103            # Spark
+    sensor_w_mm: 6.17
+    sensor_h_mm: 4.55
+    res_x: 3968
+    res_y: 2976
+
+  # --- Non-DJI -----------------------------------------------------------------
+  - make: Parrot
+    model: ANAFI
+    sensor_w_mm: 7.53
+    sensor_h_mm: 5.64
+    res_x: 5344
+    res_y: 4016
+  - make: senseFly
+    model: S.O.D.A.
+    sensor_w_mm: 12.75
+    sensor_h_mm: 8.5
+    res_x: 5472
+    res_y: 3648
+  - make: Hasselblad
+    model: L1D-20c
+    sensor_w_mm: 13.2
+    sensor_h_mm: 8.8
+    res_x: 5472
+    res_y: 3648

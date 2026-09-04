@@ -1,4 +1,7 @@
-/* The venue: facilities, surveys, scenarios over the venue map. Entry to the stages. */
+/* The site: surveys and scenarios over the site map. Entry to the stages.
+ *
+ * The outlines drawn here are the facility polygons, but they are presented as the
+ * site's own extent rather than as a separate level the operator has to navigate. */
 
 import { useMemo, useState } from "react";
 import { Link, useParams } from "react-router-dom";
@@ -46,8 +49,8 @@ export function VenuePage() {
         ]} />
       </MapView>
       <Dock>
-        <DockHeader eyebrow="Venue" title={v?.name ?? "…"} meta={v ? `${v.reference ?? ""} · EPSG:${v.srid} · origin ${v.origin_x.toFixed(0)} / ${v.origin_y.toFixed(0)} · ${v.height_datum}` : undefined} />
-        <DockTabs tabs={["Surveys", "Facilities", "Scenarios"]} active={tab} onPick={setTab} />
+        <DockHeader eyebrow="Site" title={v?.name ?? "…"} meta={v ? `${v.reference ?? ""} · EPSG:${v.srid} · origin ${v.origin_x.toFixed(0)} / ${v.origin_y.toFixed(0)} · ${v.height_datum}` : undefined} />
+        <DockTabs tabs={["Surveys", "Scenarios"]} active={tab} onPick={setTab} />
         <div className="scroll" style={{ flex: 1 }}>
           {tab === "Surveys" && (surveys.data?.length ? surveys.data.map((s) => (
             <Link key={s.id} to={`/venues/${venueId}/surveys/${s.id}/${s.status === "complete" ? "model" : s.status === "draft" || s.status === "qa_review" ? "capture" : "process"}`} style={{ display: "block", color: "inherit", padding: "9px 14px", borderBottom: "1px solid var(--color-line)" }}>
@@ -55,12 +58,6 @@ export function VenuePage() {
               <div className="m" style={{ fontSize: 11, color: "var(--color-ink-2)", marginTop: 3 }}>{s.flown_at ?? "not flown"} · {s.georef} · {s.engine ?? "—"}{s.accuracy?.check_rmse_h_m != null ? ` · check RMSE ${(s.accuracy.check_rmse_h_m * 100).toFixed(1)} H / ${((s.accuracy.check_rmse_v_m ?? 0) * 100).toFixed(1)} V cm` : ""}</div>
             </Link>
           )) : <Empty title="No surveys" hint="Upload a flight to start the pipeline." />)}
-          {tab === "Facilities" && (facilities.data ?? []).map((f) => (
-            <div key={f.id} style={{ padding: "9px 14px", borderBottom: "1px solid var(--color-line)" }}>
-              <div className="row" style={{ justifyContent: "space-between" }}><span style={{ fontWeight: 600 }}>{f.name}</span><Tag>{f.kind}</Tag></div>
-              <div className="m" style={{ fontSize: 11, color: "var(--color-ink-2)", marginTop: 3 }}>target {f.target_tier} ≥ {f.target_pct}%{f.nominal_dims ? ` · ${f.nominal_dims.length} × ${f.nominal_dims.width} m` : ""}</div>
-            </div>
-          ))}
           {tab === "Scenarios" && (scenarios.data?.length ? scenarios.data.map((sc) => (
             <Link key={sc.id} to={`/venues/${venueId}/scenarios/${sc.id}/plan`} style={{ display: "block", color: "inherit", padding: "9px 14px", borderBottom: "1px solid var(--color-line)" }}>
               <div style={{ fontWeight: 600 }}>{sc.name}</div>
